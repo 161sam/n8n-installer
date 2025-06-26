@@ -1,6 +1,6 @@
 # Übersicht der n8n-Workflows
 
-Dieser Ordner fasst die bereitgestellten Beispiel-Workflows aus dem Verzeichnis `n8n-tool-workflows/` zusammen.
+Dieser Ordner fasst die bereitgestellten Beispiel-Workflows aus dem Verzeichnis `modularium/ai-workspace/` zusammen.
 Die Workflows lassen sich über die n8n-CLI oder die Weboberfläche importieren.
 Gemeinsam bilden sie ein umfassendes Knowledge-Management-System.
 
@@ -42,7 +42,7 @@ Gemeinsam bilden sie ein umfassendes Knowledge-Management-System.
 | `Conflict-Resolution.json` | Erkennt und löst Datenkonflikte automatisiert. |
 
 Jeder Workflow ist als JSON-Datei (teilweise mit `.md`-Endung) gespeichert.
-Er folgt dem in `n8n-tool-workflows/AGENTS.md` beschriebenen Format.
+Er folgt dem in `modularium/ai-workspace/AGENTS.md` beschriebenen Format.
 
 ```bash
 n8n import:workflow --input <datei>

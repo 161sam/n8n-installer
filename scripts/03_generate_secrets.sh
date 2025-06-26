@@ -209,6 +209,7 @@ fi
 echo ""
 
 final_run_n8n_import_decision="false"
+final_run_modularium_import_decision="false"
 
 echo "Do you want to import 300 ready-made workflows for n8n? This process may take about 30 minutes to complete."
 echo ""
@@ -218,6 +219,18 @@ if [[ "$import_workflow_choice" =~ ^[Yy]$ ]]; then
     final_run_n8n_import_decision="true"
 else
     final_run_n8n_import_decision="false"
+fi
+
+# Prompt for Modularium workflow import
+echo ""
+echo "Do you want to import the latest Modularium AI workspace workflows?"
+echo ""
+read -p "Import Modularium workflows? (y/n): " import_modularium_choice
+
+if [[ "$import_modularium_choice" =~ ^[Yy]$ ]]; then
+    final_run_modularium_import_decision="true"
+else
+    final_run_modularium_import_decision="false"
 fi
 
 # Prompt for number of n8n workers
@@ -369,6 +382,7 @@ generated_values["FLOWISE_USERNAME"]="$USER_EMAIL"
 generated_values["DASHBOARD_USERNAME"]="$USER_EMAIL"
 generated_values["LETSENCRYPT_EMAIL"]="$USER_EMAIL"
 generated_values["RUN_N8N_IMPORT"]="$final_run_n8n_import_decision"
+generated_values["RUN_MODULARIUM_IMPORT"]="$final_run_modularium_import_decision"
 generated_values["PROMETHEUS_USERNAME"]="$USER_EMAIL"
 generated_values["SEARXNG_USERNAME"]="$USER_EMAIL"
 generated_values["LANGFUSE_INIT_USER_EMAIL"]="$USER_EMAIL"
@@ -390,6 +404,7 @@ found_vars["FLOWISE_USERNAME"]=0
 found_vars["DASHBOARD_USERNAME"]=0
 found_vars["LETSENCRYPT_EMAIL"]=0
 found_vars["RUN_N8N_IMPORT"]=0
+found_vars["RUN_MODULARIUM_IMPORT"]=0
 found_vars["PROMETHEUS_USERNAME"]=0
 found_vars["SEARXNG_USERNAME"]=0
 found_vars["OPENAI_API_KEY"]=0
@@ -444,7 +459,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
             # This 'else' block is for lines from template not covered by existing values or VARS_TO_GENERATE.
             # Check if it is one of the user input vars - these are handled by found_vars later if not in template.
             is_user_input_var=0 # Reset for each line
-            user_input_vars=("FLOWISE_USERNAME" "DASHBOARD_USERNAME" "LETSENCRYPT_EMAIL" "RUN_N8N_IMPORT" "PROMETHEUS_USERNAME" "SEARXNG_USERNAME" "OPENAI_API_KEY" "LANGFUSE_INIT_USER_EMAIL" "N8N_WORKER_COUNT" "WEAVIATE_USERNAME" "NEO4J_AUTH_USERNAME" "AFFINE_ADMIN_EMAIL")
+            user_input_vars=("FLOWISE_USERNAME" "DASHBOARD_USERNAME" "LETSENCRYPT_EMAIL" "RUN_N8N_IMPORT" "RUN_MODULARIUM_IMPORT" "PROMETHEUS_USERNAME" "SEARXNG_USERNAME" "OPENAI_API_KEY" "LANGFUSE_INIT_USER_EMAIL" "N8N_WORKER_COUNT" "WEAVIATE_USERNAME" "NEO4J_AUTH_USERNAME" "AFFINE_ADMIN_EMAIL")
             for uivar in "${user_input_vars[@]}"; do
                 if [[ "$varName" == "$uivar" ]]; then
                     is_user_input_var=1
@@ -527,7 +542,7 @@ if [[ -z "${generated_values[SERVICE_ROLE_KEY]}" ]]; then
 fi
 
 # Add any custom variables that weren't found in the template
-for var in "FLOWISE_USERNAME" "DASHBOARD_USERNAME" "LETSENCRYPT_EMAIL" "RUN_N8N_IMPORT" "OPENAI_API_KEY" "PROMETHEUS_USERNAME" "SEARXNG_USERNAME" "LANGFUSE_INIT_USER_EMAIL" "N8N_WORKER_COUNT" "WEAVIATE_USERNAME" "NEO4J_AUTH_USERNAME" "AFFINE_ADMIN_EMAIL"; do
+for var in "FLOWISE_USERNAME" "DASHBOARD_USERNAME" "LETSENCRYPT_EMAIL" "RUN_N8N_IMPORT" "RUN_MODULARIUM_IMPORT" "OPENAI_API_KEY" "PROMETHEUS_USERNAME" "SEARXNG_USERNAME" "LANGFUSE_INIT_USER_EMAIL" "N8N_WORKER_COUNT" "WEAVIATE_USERNAME" "NEO4J_AUTH_USERNAME" "AFFINE_ADMIN_EMAIL"; do
     if [[ ${found_vars["$var"]} -eq 0 && -v generated_values["$var"] ]]; then
         # Before appending, check if it's already in TMP_ENV_FILE to avoid duplicates
         if ! grep -q -E "^${var}=" "$TMP_ENV_FILE"; then
