@@ -1,0 +1,421 @@
+{
+  "name": "AppFlowy Content Sync to Vector Store",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificDatabase",
+        "databaseId": "{{ $vars.appflowy_main_database_id }}",
+        "event": "rowCreated",
+        "options": {}
+      },
+      "id": "appflowy-row-created-trigger",
+      "name": "AppFlowy Row Created",
+      "type": "n8n-nodes-appflowy.trigger",
+      "typeVersion": 1,
+      "position": [600, 200],
+      "credentials": {
+        "appFlowyApi": {
+          "id": "appflowy_credentials",
+          "name": "AppFlowy API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificDatabase", 
+        "databaseId": "{{ $vars.appflowy_main_database_id }}",
+        "event": "rowUpdated",
+        "options": {}
+      },
+      "id": "appflowy-row-updated-trigger",
+      "name": "AppFlowy Row Updated",
+      "type": "n8n-nodes-appflowy.trigger",
+      "typeVersion": 1,
+      "position": [600, 400],
+      "credentials": {
+        "appFlowyApi": {
+          "id": "appflowy_credentials",
+          "name": "AppFlowy API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "content-extraction",
+              "name": "content",
+              "value": "={{ $json.title ? $json.title + '\\n\\n' + ($json.content || $json.description || '') : ($json.content || $json.description || 'No content available') }}",
+              "type": "string"
+            },
+            {
+              "id": "metadata-creation",
+              "name": "metadata",
+              "value": "={{ { source: 'appflowy', type: 'database_row', database_id: $json.database_id, row_id: $json.id, workspace_id: $json.workspace_id, created_at: $json.created_at, updated_at: $json.updated_at, title: $json.title } }}",
+              "type": "object"
+            },
+            {
+              "id": "document-id",
+              "name": "document_id",
+              "value": "={{ 'appflowy_' + $json.database_id + '_' + $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-appflowy-content",
+      "name": "Process AppFlowy Content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "clear-existing",
+              "name": "action",
+              "value": "clear_existing", 
+              "type": "string"
+            },
+            {
+              "id": "document-id-clear",
+              "name": "document_id",
+              "value": "={{ $('Process AppFlowy Content').item.json.document_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-vector-clear",
+      "name": "Prepare Vector Clear",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1150, 300]
+    },
+    {
+      "parameters": {
+        "code": {
+          "execute": {
+            "code": "const { QdrantVectorStore } = require(\"@langchain/qdrant\");\nconst { OllamaEmbeddings } = require(\"@langchain/community/embeddings/ollama\");\n\nconst embeddings = new OllamaEmbeddings({\n  model: \"nomic-embed-text\",\n  baseUrl: \"http://ollama:11434\"\n});\n\nconst vectorStore = await QdrantVectorStore.fromExistingCollection(\n  embeddings,\n  {\n    url: \"http://qdrant:6333\",\n    collectionName: \"knowledge_base\",\n  }\n);\n\nconst documentIdToDelete = this.getInputData()[0].json.document_id;\n\nconst filter = {\n  must: [\n    {\n      key: \"metadata.document_id\",\n      match: {\n        value: documentIdToDelete,\n      },\n    },\n  ],\n};\n\n// Delete existing vectors for this document\nvectorStore.client.delete(\"knowledge_base\", {\n  filter\n});\n\nreturn [{ json: { document_id: documentIdToDelete, status: \"cleared\" } }];"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "main",
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "main"
+            }
+          ]
+        }
+      },
+      "id": "clear-existing-vectors",
+      "name": "Clear Existing Vectors",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [1400, 300]
+    },
+    {
+      "parameters": {
+        "chunkSize": 500,
+        "chunkOverlap": 50,
+        "options": {}
+      },
+      "id": "text-splitter",
+      "name": "Recursive Character Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [1650, 500]
+    },
+    {
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "={{ $('Process AppFlowy Content').item.json.metadata.source }}"
+              },
+              {
+                "name": "type", 
+                "value": "={{ $('Process AppFlowy Content').item.json.metadata.type }}"
+              },
+              {
+                "name": "database_id",
+                "value": "={{ $('Process AppFlowy Content').item.json.metadata.database_id }}"
+              },
+              {
+                "name": "row_id",
+                "value": "={{ $('Process AppFlowy Content').item.json.metadata.row_id }}"
+              },
+              {
+                "name": "document_id",
+                "value": "={{ $('Process AppFlowy Content').item.json.document_id }}"
+              },
+              {
+                "name": "workspace_id",
+                "value": "={{ $('Process AppFlowy Content').item.json.metadata.workspace_id }}"
+              },
+              {
+                "name": "title",
+                "value": "={{ $('Process AppFlowy Content').item.json.metadata.title }}"
+              },
+              {
+                "name": "updated_at",
+                "value": "={{ $('Process AppFlowy Content').item.json.metadata.updated_at }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "document-loader",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest"
+      },
+      "id": "embeddings-ollama",
+      "name": "Embeddings Ollama",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [1900, 300],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama_credentials",
+          "name": "Ollama API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "knowledge_base",
+          "mode": "list",
+          "cachedResultName": "knowledge_base"
+        },
+        "options": {}
+      },
+      "id": "qdrant-vector-store",
+      "name": "Qdrant Vector Store Insert",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [2150, 300],
+      "credentials": {
+        "qdrantApi": {
+          "id": "qdrant_credentials",
+          "name": "Qdrant API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "table": {
+          "__rl": true,
+          "value": "knowledge_sync_log",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "document_id",
+              "value": "={{ $('Process AppFlowy Content').item.json.document_id }}"
+            },
+            {
+              "column": "source_system",
+              "value": "appflowy"
+            },
+            {
+              "column": "source_id",
+              "value": "={{ $('Process AppFlowy Content').item.json.metadata.row_id }}"
+            },
+            {
+              "column": "content_hash",
+              "value": "={{ $crypto.createHash('md5').update($('Process AppFlowy Content').item.json.content).digest('hex') }}"
+            },
+            {
+              "column": "metadata",
+              "value": "={{ $('Process AppFlowy Content').item.json.metadata }}"
+            },
+            {
+              "column": "sync_timestamp", 
+              "value": "={{ $now }}"
+            },
+            {
+              "column": "status",
+              "value": "synced"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-sync-status",
+      "name": "Log Sync Status",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1,
+      "position": [2400, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase_credentials",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## AppFlowy Content Sync to Vector Store\n\n**Purpose:** Automatically sync AppFlowy database content to the central knowledge vector store.\n\n**Triggers:**\n- New row created in AppFlowy database\n- Existing row updated in AppFlowy database\n\n**Process:**\n1. Extract content and metadata from AppFlowy\n2. Clear existing vectors for updated content\n3. Split content into chunks\n4. Generate embeddings using Ollama\n5. Store in Qdrant vector database\n6. Log sync status to Supabase",
+        "height": 400,
+        "width": 600,
+        "color": 4
+      },
+      "id": "workflow-documentation",
+      "name": "Workflow Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [200, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "AppFlowy Row Created": {
+      "main": [
+        [
+          {
+            "node": "Process AppFlowy Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFlowy Row Updated": {
+      "main": [
+        [
+          {
+            "node": "Process AppFlowy Content", 
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process AppFlowy Content": {
+      "main": [
+        [
+          {
+            "node": "Prepare Vector Clear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Vector Clear": {
+      "main": [
+        [
+          {
+            "node": "Clear Existing Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Existing Vectors": {
+      "main": [
+        [
+          {
+            "node": "Document Loader",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter", 
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store Insert",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Ollama": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store Insert",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store Insert": {
+      "main": [
+        [
+          {
+            "node": "Log Sync Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "appflowy-sync-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "AppFlowyContentSync",
+  "tags": ["knowledge-management", "appflowy", "vector-store", "sync"]
+}
