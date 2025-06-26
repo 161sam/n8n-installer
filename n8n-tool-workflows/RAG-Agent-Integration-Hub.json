@@ -1,0 +1,836 @@
+{
+  "name": "RAG Agent Integration Hub mit Knowledge Management",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "enhanced-postgres-chat-memory",
+      "name": "Enhanced Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.1,
+      "position": [1040, 560],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama3.1:latest",
+        "options": {}
+      },
+      "id": "enhanced-ollama-chat-model",
+      "name": "Enhanced Ollama Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [920, 560],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama_credentials",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama3.1:latest",
+        "options": {}
+      },
+      "id": "enhanced-ollama-model",
+      "name": "Enhanced Ollama Model",
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [1960, 500],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama_credentials",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "knowledge_base_search",
+        "description": "Search through the integrated knowledge base including AppFlowy pages, Affine documents, Google Drive files, and vector database content. Use this for semantic similarity search across all platforms.",
+        "topK": 5
+      },
+      "id": "knowledge-base-vector-tool",
+      "name": "Knowledge Base Vector Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1,
+      "position": [1740, 200]
+    },
+    {
+      "parameters": {
+        "name": "appflowy_direct_query",
+        "description": "Query AppFlowy databases and pages directly using semantic search or direct database queries. Best for getting latest AppFlowy content and specific database information.",
+        "workflowId": {
+          "__rl": true,
+          "value": "AppFlowyQueryTool",
+          "mode": "list",
+          "cachedResultName": "AppFlowy Direct Query Tool"
+        }
+      },
+      "id": "appflowy-query-tool",
+      "name": "AppFlowy Query Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1740, 280]
+    },
+    {
+      "parameters": {
+        "name": "affine_direct_query",
+        "description": "Query Affine documents, whiteboards, and workspaces directly using GraphQL API and semantic search. Best for getting latest Affine content and collaborative workspace information.",
+        "workflowId": {
+          "__rl": true,
+          "value": "AffineQueryTool",
+          "mode": "list",
+          "cachedResultName": "Affine Direct Query Tool"
+        }
+      },
+      "id": "affine-query-tool",
+      "name": "Affine Query Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1740, 360]
+    },
+    {
+      "parameters": {
+        "name": "cross_platform_search",
+        "description": "Comprehensive search across all knowledge management platforms (AppFlowy, Affine, Google Drive, Vector DB) with intelligent deduplication and result ranking. Use for broad searches across multiple systems.",
+        "workflowId": {
+          "__rl": true,
+          "value": "CrossPlatformSearch",
+          "mode": "list",
+          "cachedResultName": "Cross-Platform Knowledge Search Tool"
+        }
+      },
+      "id": "cross-platform-search-tool",
+      "name": "Cross-Platform Search Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1740, 440]
+    },
+    {
+      "parameters": {
+        "name": "knowledge_orchestrator",
+        "description": "Trigger knowledge management system orchestration, health monitoring, and sync operations. Use when you need to check system health, trigger syncs, or perform maintenance operations.",
+        "workflowId": {
+          "__rl": true,
+          "value": "KnowledgeOrchestrator",
+          "mode": "list",
+          "cachedResultName": "Central Knowledge Management Orchestrator"
+        }
+      },
+      "id": "orchestrator-tool",
+      "name": "Orchestrator Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1740, 520]
+    },
+    {
+      "parameters": {
+        "name": "conflict_resolution",
+        "description": "Detect and resolve conflicts between synchronized content across different platforms. Use when there are data inconsistencies or synchronization issues.",
+        "workflowId": {
+          "__rl": true,
+          "value": "ConflictResolution",
+          "mode": "list",
+          "cachedResultName": "Knowledge Management Conflict Resolution"
+        }
+      },
+      "id": "conflict-resolution-tool",
+      "name": "Conflict Resolution Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1740, 600]
+    },
+    {
+      "parameters": {
+        "name": "backup_system",
+        "description": "Manage backup and recovery operations for the knowledge management system. Use for creating backups, checking backup status, or performing recovery operations.",
+        "workflowId": {
+          "__rl": true,
+          "value": "BackupRecovery",
+          "mode": "list",
+          "cachedResultName": "Automated Knowledge Management Backup & Recovery"
+        }
+      },
+      "id": "backup-recovery-tool",
+      "name": "Backup Recovery Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1740, 680]
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest"
+      },
+      "id": "enhanced-embeddings-ollama",
+      "name": "Enhanced Embeddings Ollama",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [1840, 800],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama_credentials",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "enhanced-chat-trigger",
+      "name": "Enhanced Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [620, 340],
+      "webhookId": "enhanced-rag-agent-hub"
+    },
+    {
+      "parameters": {
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "knowledge_base",
+          "mode": "list",
+          "cachedResultName": "knowledge_base"
+        },
+        "options": {}
+      },
+      "id": "enhanced-qdrant-vector-store",
+      "name": "Enhanced Qdrant Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [1560, 680],
+      "credentials": {
+        "qdrantApi": {
+          "id": "qdrant_credentials",
+          "name": "Qdrant API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "enhanced-respond-to-webhook",
+      "name": "Enhanced Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 340]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rag-agent-hub",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "enhanced-webhook",
+      "name": "Enhanced Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [620, 520],
+      "webhookId": "rag-agent-hub"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are an advanced AI assistant with comprehensive access to a sophisticated knowledge management ecosystem. You have access to multiple specialized tools and can help users with:\n\n## Available Knowledge Sources:\n1. **AppFlowy**: Project management, notes, databases, and wikis\n2. **Affine**: Collaborative documents, whiteboards, and workspaces\n3. **Google Drive**: Files, documents, and shared resources\n4. **Vector Database**: Semantic search across all ingested content\n\n## Specialized Tools at Your Disposal:\n\n**Search & Query Tools:**\n- `knowledge_base_search`: Semantic similarity search across all platforms\n- `appflowy_direct_query`: Direct AppFlowy database and page queries\n- `affine_direct_query`: Direct Affine workspace and document queries\n- `cross_platform_search`: Comprehensive multi-platform search with deduplication\n\n**System Management Tools:**\n- `knowledge_orchestrator`: System health monitoring and sync operations\n- `conflict_resolution`: Detect and resolve data conflicts between platforms\n- `backup_system`: Backup and recovery management\n\n## How to Help Users:\n\n**For Information Requests:**\n1. Determine the best search strategy based on the user's needs\n2. Use appropriate tools to gather relevant information\n3. Provide comprehensive answers with source attribution\n4. Suggest related information when helpful\n\n**For System Operations:**\n1. Use orchestrator tool for health checks and sync operations\n2. Use conflict resolution when data inconsistencies are reported\n3. Use backup tools for data protection needs\n\n**Response Guidelines:**\n- Always cite your sources (\"According to AppFlowy project database...\", \"From Affine workspace...\", etc.)\n- Provide actionable insights and next steps when appropriate\n- Use multiple tools when necessary for comprehensive answers\n- Explain which tools you're using and why\n- If information conflicts exist, note the discrepancies and suggest resolution\n\n**Example Tool Usage:**\n- For project status: Use `appflowy_direct_query` for structured data\n- For document searches: Use `cross_platform_search` for comprehensive results\n- For system issues: Use `knowledge_orchestrator` for diagnostics\n- For broad topics: Combine `knowledge_base_search` with specific platform queries\n\nAlways be helpful, accurate, and transparent about your information sources and limitations.",
+        "options": {
+          "systemMessage": "You are an advanced knowledge management AI assistant with access to comprehensive tools for searching, managing, and maintaining a multi-platform knowledge ecosystem."
+        }
+      },
+      "id": "enhanced-ai-agent",
+      "name": "Enhanced AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [1000, 340]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "enhanced-chat-input",
+              "name": "chatInput",
+              "value": "={{ $json?.chatInput || $json.body?.chatInput || $json.body?.message || $json.message || $json.body?.query }}",
+              "type": "string"
+            },
+            {
+              "id": "enhanced-session-id",
+              "name": "sessionId",
+              "value": "={{ $json?.sessionId || $json.body?.sessionId || 'rag-hub-' + $moment().format('YYYY-MM-DD-HH-mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "user-context",
+              "name": "userContext",
+              "value": "={{ $json?.userContext || $json.body?.userContext || {} }}",
+              "type": "object"
+            },
+            {
+              "id": "search-preferences",
+              "name": "searchPreferences",
+              "value": "={{ $json?.searchPreferences || $json.body?.searchPreferences || { preferredSources: ['vector_db', 'appflowy', 'affine'], searchDepth: 'comprehensive', enableCrossPlatform: true, includeMetadata: true } }}",
+              "type": "object"
+            },
+            {
+              "id": "operation-mode",
+              "name": "operationMode",
+              "value": "={{ $json?.operationMode || $json.body?.operationMode || 'standard' }}",
+              "type": "string"
+            },
+            {
+              "id": "enable-system-tools",
+              "name": "enableSystemTools",
+              "value": "={{ $json?.enableSystemTools || $json.body?.enableSystemTools || true }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "enhanced-edit-fields",
+      "name": "Enhanced Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [820, 340]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "query-analysis",
+              "name": "queryAnalysis",
+              "value": "={{ {\n  queryType: (() => {\n    const input = $json.chatInput.toLowerCase();\n    if (input.includes('appflowy') || input.includes('project') || input.includes('task')) return 'appflowy_focused';\n    if (input.includes('affine') || input.includes('whiteboard') || input.includes('collaborate')) return 'affine_focused';\n    if (input.includes('system') || input.includes('health') || input.includes('sync')) return 'system_management';\n    if (input.includes('backup') || input.includes('restore') || input.includes('recovery')) return 'backup_management';\n    if (input.includes('conflict') || input.includes('error') || input.includes('inconsistent')) return 'conflict_resolution';\n    return 'general_knowledge';\n  })(),\n  searchKeywords: $json.chatInput.split(' ').filter(word => word.length > 3 && !['what', 'when', 'where', 'how', 'why', 'which', 'this', 'that', 'with', 'from', 'they', 'them', 'their', 'there', 'then', 'about'].includes(word.toLowerCase())),\n  requiresRealtime: $json.chatInput.toLowerCase().includes('latest') || $json.chatInput.toLowerCase().includes('current') || $json.chatInput.toLowerCase().includes('now') || $json.chatInput.toLowerCase().includes('today'),\n  complexity: $json.chatInput.split(' ').length > 10 ? 'high' : ($json.chatInput.split(' ').length > 5 ? 'medium' : 'low'),\n  timestamp: $now\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "analyze-query-intent",
+      "name": "Analyze Query Intent",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [620, 680]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": {
+          "__rl": true,
+          "value": "enhanced_chat_sessions",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "session_id",
+              "value": "={{ $('Enhanced Edit Fields').item.json.sessionId }}"
+            },
+            {
+              "column": "user_input",
+              "value": "={{ $('Enhanced Edit Fields').item.json.chatInput }}"
+            },
+            {
+              "column": "user_context",
+              "value": "={{ $('Enhanced Edit Fields').item.json.userContext }}"
+            },
+            {
+              "column": "search_preferences",
+              "value": "={{ $('Enhanced Edit Fields').item.json.searchPreferences }}"
+            },
+            {
+              "column": "query_analysis",
+              "value": "={{ $('Analyze Query Intent').item.json.queryAnalysis }}"
+            },
+            {
+              "column": "operation_mode",
+              "value": "={{ $('Enhanced Edit Fields').item.json.operationMode }}"
+            },
+            {
+              "column": "timestamp",
+              "value": "={{ $now }}"
+            },
+            {
+              "column": "response",
+              "value": "={{ $('Enhanced AI Agent').item.json.output }}"
+            },
+            {
+              "column": "tools_used",
+              "value": "{{ [] }}"
+            },
+            {
+              "column": "processing_time_ms",
+              "value": "={{ $now - $('Analyze Query Intent').item.json.queryAnalysis.timestamp }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-enhanced-chat-session",
+      "name": "Log Enhanced Chat Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1200, 520],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "system-management-query",
+              "leftValue": "={{ $json.queryAnalysis.queryType }}",
+              "rightValue": "system_management",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-system-management-query",
+      "name": "Check System Management Query",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 680]
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.{{ $vars.domain_name }}/webhook/knowledge-orchestrator",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "mode": "health_check",
+          "enableAnalytics": true,
+          "timestamp": "={{ $now }}"
+        }
+      },
+      "id": "trigger-system-health-check",
+      "name": "Trigger System Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1150, 600]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "system-status-summary",
+              "name": "systemStatusSummary",
+              "value": "={{ {\n  healthCheckTriggered: true,\n  timestamp: $now,\n  orchestrationResponse: $json || 'System health check initiated',\n  queryType: $('Analyze Query Intent').item.json.queryAnalysis.queryType\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-system-status",
+      "name": "Process System Status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1400, 600]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "google-drive-integration",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "google-drive-integration-webhook",
+      "name": "Google Drive Integration Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 800],
+      "webhookId": "google-drive-integration"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "drive-integration-request",
+              "name": "integrationRequest",
+              "value": "={{ {\n  action: $json.body.action || 'sync',\n  fileId: $json.body.fileId,\n  folderId: $json.body.folderId,\n  triggerFullSync: $json.body.triggerFullSync || false,\n  timestamp: $now\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-drive-integration",
+      "name": "Process Drive Integration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 800]
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.{{ $vars.domain_name }}/webhook/google-drive-webhook-sync",
+        "options": {
+          "timeout": 60000
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "fileId": "={{ $json.integrationRequest.fileId }}",
+          "action": "={{ $json.integrationRequest.action }}"
+        }
+      },
+      "id": "trigger-google-drive-sync",
+      "name": "Trigger Google Drive Sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 800]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-drive-integration",
+      "name": "Respond to Drive Integration",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [950, 800]
+    },
+    {
+      "parameters": {
+        "content": "## RAG Agent Integration Hub mit Knowledge Management\n\n**Zweck:** Erweiterte Integration des ursprünglichen Local RAG AI Agent mit allen neuen Knowledge Management Workflows und Tools.\n\n## Erweiterte Funktionalitäten\n\n**Ursprüngliche RAG-Funktionen (erweitert):**\n- Postgres Chat Memory für Konversationshistorie\n- Ollama LLM Integration (llama3.1:latest)\n- Vector Store Integration mit Qdrant\n- Google Drive Integration für Dokumente\n\n**Neue Tool-Integration:**\n1. **AppFlowy Direct Query**: Direkte Abfragen von AppFlowy Datenbanken\n2. **Affine Direct Query**: GraphQL-basierte Affine Workspace-Abfragen\n3. **Cross-Platform Search**: Plattformübergreifende intelligente Suche\n4. **Knowledge Orchestrator**: System-Gesundheit und Sync-Operationen\n5. **Conflict Resolution**: Automatische Konfliktlösung zwischen Plattformen\n6. **Backup & Recovery**: Backup-Management und Wiederherstellung\n\n## Intelligente Query-Analyse\n\n**Query-Typen:**\n- `appflowy_focused`: AppFlowy-spezifische Anfragen\n- `affine_focused`: Affine-spezifische Anfragen\n- `system_management`: System-Gesundheit und Wartung\n- `backup_management`: Backup und Recovery\n- `conflict_resolution`: Konfliktlösung\n- `general_knowledge`: Allgemeine Wissensanfragen\n\n**Adaptive Tool-Auswahl:**\n- Automatische Bestimmung der besten Such-Strategie\n- Kontextbasierte Tool-Auswahl\n- Multi-Tool-Koordination für komplexe Anfragen\n\n## Enhanced Features\n\n**Session Management:**\n- Erweiterte Chat-Session-Protokollierung\n- User-Kontext und Präferenzen\n- Query-Analyse und Performance-Tracking\n\n**System Integration:**\n- Automatische System-Gesundheitschecks\n- Google Drive Integration Webhook\n- Real-time Sync-Trigger\n\n**Response Enhancement:**\n- Source Attribution für alle Antworten\n- Multi-Platform-Kontext\n- Conflict Detection und Resolution\n\n## API Endpoints\n\n**Haupt-Chat-Interface:**\n- Chat-Trigger: Interaktives Chat-Interface\n- POST /webhook/rag-agent-hub: API-basierte Anfragen\n\n**Google Drive Integration:**\n- POST /webhook/google-drive-integration: Drive-Sync-Trigger\n\n**Parameter:**\n- `chatInput/message/query`: Benutzeranfrage\n- `sessionId`: Session-Identifikation\n- `searchPreferences`: Such-Präferenzen\n- `operationMode`: Betriebsmodus (standard, system, maintenance)\n- `enableSystemTools`: System-Tools aktivieren\n\n## Integration mit Original RAG Agent\n\n**Kompatibilität:**\n- Behält alle ursprünglichen Google Drive Trigger\n- Erweitert Vector Store Funktionalität\n- Verbessert Chat Memory Management\n- Integriert alle neuen Knowledge Management Tools\n\n**Migration:**\n- Nahtlose Erweiterung des bestehenden Workflows\n- Rückwärtskompatibilität mit ursprünglichen Webhooks\n- Erweiterte Tool-Suite ohne Breaking Changes",
+        "height": 900,
+        "width": 1000,
+        "color": 6
+      },
+      "id": "rag-hub-documentation",
+      "name": "RAG Hub Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2200, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Enhanced Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Ollama Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Knowledge Base Vector Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AppFlowy Query Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Affine Query Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Cross-Platform Search Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Orchestrator Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Conflict Resolution Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Backup Recovery Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Embeddings Ollama": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Enhanced Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Edit Fields",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Analyze Query Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Qdrant Vector Store": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Knowledge Base Vector Tool",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Webhook": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Edit Fields",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Analyze Query Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Enhanced Chat Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Query Intent": {
+      "main": [
+        [
+          {
+            "node": "Check System Management Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check System Management Query": {
+      "main": [
+        [
+          {
+            "node": "Trigger System Health Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger System Health Check": {
+      "main": [
+        [
+          {
+            "node": "Process System Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Base Vector Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFlowy Query Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Affine Query Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Cross-Platform Search Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Orchestrator Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Conflict Resolution Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Backup Recovery Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "Google Drive Integration Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Drive Integration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Drive Integration": {
+      "main": [
+        [
+          {
+            "node": "Trigger Google Drive Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Google Drive Sync": {
+      "main": [
+        [
+          {
+            "node": "Respond to Drive Integration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "rag-hub-integration-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "rag-agent-integration-hub"
+  },
+  "id": "RAGAgentIntegrationHub",
+  "tags": ["rag-agent", "integration", "knowledge-management", "enhanced", "hub"]
+}
