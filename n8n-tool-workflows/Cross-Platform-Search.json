@@ -1,0 +1,787 @@
+{
+  "name": "Cross-Platform Knowledge Search Tool",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cross-platform-search",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cross-platform-search-webhook",
+      "name": "Cross-Platform Search Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400],
+      "webhookId": "cross-platform-search"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "search-query",
+              "name": "searchQuery",
+              "value": "={{ $json.body.query || $json.body.searchTerm || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "target-platforms",
+              "name": "targetPlatforms",
+              "value": "={{ $json.body.platforms || ['appflowy', 'affine', 'google_drive', 'vector_db'] }}",
+              "type": "array"
+            },
+            {
+              "id": "search-mode",
+              "name": "searchMode",
+              "value": "={{ $json.body.mode || 'comprehensive' }}",
+              "type": "string"
+            },
+            {
+              "id": "result-limit-cross",
+              "name": "resultLimit",
+              "value": "={{ $json.body.limit || 20 }}",
+              "type": "number"
+            },
+            {
+              "id": "enable-deduplication",
+              "name": "enableDeduplication",
+              "value": "={{ $json.body.enableDeduplication || true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "priority-sources",
+              "name": "prioritySources",
+              "value": "={{ $json.body.prioritySources || [] }}",
+              "type": "array"
+            },
+            {
+              "id": "search-timestamp",
+              "name": "timestamp",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "enable-analytics",
+              "name": "enableAnalytics",
+              "value": "={{ $json.body.enableAnalytics || true }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-cross-platform-query",
+      "name": "Process Cross-Platform Query",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "appflowy-enabled",
+              "leftValue": "={{ $json.targetPlatforms.includes('appflowy') }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-appflowy-enabled",
+      "name": "Check AppFlowy Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "affine-enabled",
+              "leftValue": "={{ $json.targetPlatforms.includes('affine') }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-affine-enabled",
+      "name": "Check Affine Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "vector-db-enabled",
+              "leftValue": "={{ $json.targetPlatforms.includes('vector_db') }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-vector-db-enabled",
+      "name": "Check Vector DB Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "google-drive-enabled",
+              "leftValue": "={{ $json.targetPlatforms.includes('google_drive') }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-google-drive-enabled",
+      "name": "Check Google Drive Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 500]
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.{{ $vars.domain_name }}/webhook/appflowy-query-tool",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "query": "={{ $('Process Cross-Platform Query').item.json.searchQuery }}",
+          "queryType": "semantic_search",
+          "limit": "={{ Math.ceil($('Process Cross-Platform Query').item.json.resultLimit / 4) }}",
+          "includeMetadata": true
+        }
+      },
+      "id": "query-appflowy",
+      "name": "Query AppFlowy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [950, 150]
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.{{ $vars.domain_name }}/webhook/affine-query-tool",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "query": "={{ $('Process Cross-Platform Query').item.json.searchQuery }}",
+          "queryType": "semantic_search",
+          "limit": "={{ Math.ceil($('Process Cross-Platform Query').item.json.resultLimit / 4) }}",
+          "includeMetadata": true
+        }
+      },
+      "id": "query-affine",
+      "name": "Query Affine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [950, 250]
+    },
+    {
+      "parameters": {
+        "code": {
+          "execute": {
+            "code": "const { QdrantVectorStore } = require(\"@langchain/qdrant\");\nconst { OllamaEmbeddings } = require(\"@langchain/community/embeddings/ollama\");\n\nconst embeddings = new OllamaEmbeddings({\n  model: \"nomic-embed-text\",\n  baseUrl: \"http://ollama:11434\"\n});\n\nconst vectorStore = await QdrantVectorStore.fromExistingCollection(\n  embeddings,\n  {\n    url: \"http://qdrant:6333\",\n    collectionName: \"knowledge_base\",\n  }\n);\n\nconst queryText = this.getInputData()[0].json.searchQuery;\nconst resultLimit = Math.ceil(this.getInputData()[0].json.resultLimit / 4) || 5;\n\n// Comprehensive search across all sources in vector DB\nconst results = await vectorStore.similaritySearch(queryText, resultLimit);\n\n// Format results with enhanced metadata\nconst formattedResults = results.map((doc, index) => ({\n  id: `vector_${index}`,\n  content: doc.pageContent,\n  metadata: {\n    ...doc.metadata,\n    searchSource: 'vector_database',\n    queryMatched: queryText\n  },\n  source: 'vector_database',\n  relevanceScore: doc.score || 0,\n  platform: doc.metadata?.source || 'unknown'\n}));\n\nreturn [{ json: { results: formattedResults, searchType: 'vector_search', totalResults: formattedResults.length } }];"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "main",
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "main"
+            }
+          ]
+        }
+      },
+      "id": "query-vector-database",
+      "name": "Query Vector Database",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [950, 350]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "search",
+        "q": "={{ $('Process Cross-Platform Query').item.json.searchQuery }}",
+        "options": {
+          "fields": ["id", "name", "mimeType", "createdTime", "modifiedTime", "size", "webViewLink"]
+        }
+      },
+      "id": "query-google-drive",
+      "name": "Query Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [950, 450],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google_drive_credentials",
+          "name": "Google Drive OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "format-google-drive-results",
+              "name": "formattedResults",
+              "value": "={{ $json.files?.map((file, index) => ({\n  id: `gdrive_${file.id}`,\n  content: `${file.name}\\n\\nFile Type: ${file.mimeType}\\nCreated: ${file.createdTime}\\nModified: ${file.modifiedTime}\\nSize: ${file.size || 'Unknown'} bytes`,\n  metadata: {\n    source: 'google_drive',\n    type: 'file',\n    file_id: file.id,\n    file_name: file.name,\n    mime_type: file.mimeType,\n    created_time: file.createdTime,\n    modified_time: file.modifiedTime,\n    web_view_link: file.webViewLink,\n    searchSource: 'google_drive_api'\n  },\n  source: 'google_drive',\n  relevanceScore: 0.8, // Base relevance for Google Drive matches\n  platform: 'google_drive'\n})) || [] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-google-drive-results",
+      "name": "Format Google Drive Results",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1200, 450]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aggregate-all-results",
+              "name": "allResults",
+              "value": "={{ [\n  ...($('Query AppFlowy').all().flatMap(item => item.rankedResults || [])),\n  ...($('Query Affine').all().flatMap(item => item.rankedResults || [])),\n  ...($('Query Vector Database').all().flatMap(item => item.results || [])),\n  ...($('Format Google Drive Results').all().flatMap(item => item.formattedResults || []))\n] }}",
+              "type": "array"
+            },
+            {
+              "id": "platform-summary",
+              "name": "platformSummary",
+              "value": "={{ {\n  appflowy: ($('Query AppFlowy').all().flatMap(item => item.rankedResults || [])).length,\n  affine: ($('Query Affine').all().flatMap(item => item.rankedResults || [])).length,\n  vector_database: ($('Query Vector Database').all().flatMap(item => item.results || [])).length,\n  google_drive: ($('Format Google Drive Results').all().flatMap(item => item.formattedResults || [])).length\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aggregate-platform-results",
+      "name": "Aggregate Platform Results",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "deduplication-enabled",
+              "leftValue": "={{ $('Process Cross-Platform Query').item.json.enableDeduplication }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-deduplication-enabled",
+      "name": "Check Deduplication Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1700, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "deduplicated-results",
+              "name": "deduplicatedResults",
+              "value": "={{ (() => {\n  const results = $json.allResults;\n  const seen = new Set();\n  const deduplicated = [];\n  \n  for (const result of results) {\n    // Create a content fingerprint for deduplication\n    const contentFingerprint = result.content?.substring(0, 100).toLowerCase().replace(/\\s+/g, ' ').trim();\n    const titleFingerprint = result.metadata?.title?.toLowerCase();\n    const fingerprint = titleFingerprint || contentFingerprint;\n    \n    if (fingerprint && !seen.has(fingerprint)) {\n      seen.add(fingerprint);\n      deduplicated.push({\n        ...result,\n        deduplicationFingerprint: fingerprint\n      });\n    }\n  }\n  \n  return deduplicated;\n})() }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "perform-deduplication",
+      "name": "Perform Deduplication",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1950, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "final-ranked-results",
+              "name": "finalResults",
+              "value": "={{ (() => {\n  const results = $('Perform Deduplication').all().length > 0 \n    ? $('Perform Deduplication').item.json.deduplicatedResults \n    : $json.allResults;\n  \n  const prioritySources = $('Process Cross-Platform Query').item.json.prioritySources;\n  const resultLimit = $('Process Cross-Platform Query').item.json.resultLimit;\n  \n  // Apply priority boosting\n  const boostedResults = results.map(result => ({\n    ...result,\n    finalScore: result.relevanceScore + (prioritySources.includes(result.platform) ? 0.2 : 0)\n  }));\n  \n  // Sort by final score and limit results\n  return boostedResults\n    .sort((a, b) => b.finalScore - a.finalScore)\n    .slice(0, resultLimit);\n})() }}",
+              "type": "array"
+            },
+            {
+              "id": "search-analytics",
+              "name": "searchAnalytics",
+              "value": "={{ {\n  queryText: $('Process Cross-Platform Query').item.json.searchQuery,\n  searchMode: $('Process Cross-Platform Query').item.json.searchMode,\n  platformsSearched: $('Process Cross-Platform Query').item.json.targetPlatforms,\n  totalResultsFound: $json.finalResults.length,\n  platformBreakdown: $('Aggregate Platform Results').item.json.platformSummary,\n  deduplicationEnabled: $('Process Cross-Platform Query').item.json.enableDeduplication,\n  prioritySourcesUsed: $('Process Cross-Platform Query').item.json.prioritySources,\n  searchTimestamp: $('Process Cross-Platform Query').item.json.timestamp,\n  processingTimeMs: $now - $('Process Cross-Platform Query').item.json.timestamp\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "finalize-cross-platform-results",
+      "name": "Finalize Cross-Platform Results",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2200, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "analytics-enabled",
+              "leftValue": "={{ $('Process Cross-Platform Query').item.json.enableAnalytics }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-analytics-enabled",
+      "name": "Check Analytics Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2450, 400]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": {
+          "__rl": true,
+          "value": "cross_platform_search_analytics",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "query_text",
+              "value": "={{ $('Finalize Cross-Platform Results').item.json.searchAnalytics.queryText }}"
+            },
+            {
+              "column": "search_mode",
+              "value": "={{ $('Finalize Cross-Platform Results').item.json.searchAnalytics.searchMode }}"
+            },
+            {
+              "column": "platforms_searched",
+              "value": "={{ $('Finalize Cross-Platform Results').item.json.searchAnalytics.platformsSearched }}"
+            },
+            {
+              "column": "total_results",
+              "value": "={{ $('Finalize Cross-Platform Results').item.json.searchAnalytics.totalResultsFound }}"
+            },
+            {
+              "column": "platform_breakdown",
+              "value": "={{ $('Finalize Cross-Platform Results').item.json.searchAnalytics.platformBreakdown }}"
+            },
+            {
+              "column": "processing_time_ms",
+              "value": "={{ $('Finalize Cross-Platform Results').item.json.searchAnalytics.processingTimeMs }}"
+            },
+            {
+              "column": "deduplication_enabled",
+              "value": "={{ $('Finalize Cross-Platform Results').item.json.searchAnalytics.deduplicationEnabled }}"
+            },
+            {
+              "column": "created_at",
+              "value": "={{ $now }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-cross-platform-analytics",
+      "name": "Log Cross-Platform Analytics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2700, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "api-response",
+              "name": "response",
+              "value": "={{ {\n  results: $('Finalize Cross-Platform Results').item.json.finalResults,\n  analytics: $('Finalize Cross-Platform Results').item.json.searchAnalytics,\n  metadata: {\n    queryProcessed: $('Process Cross-Platform Query').item.json.searchQuery,\n    totalPlatforms: $('Process Cross-Platform Query').item.json.targetPlatforms.length,\n    resultsReturned: $('Finalize Cross-Platform Results').item.json.finalResults.length,\n    timestamp: $now\n  }\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-api-response",
+      "name": "Prepare API Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2950, 400]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-cross-platform-search",
+      "name": "Respond to Cross-Platform Search",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3200, 400]
+    },
+    {
+      "parameters": {
+        "content": "## Cross-Platform Knowledge Search Tool\n\n**Purpose:** Unified search interface across all knowledge management platforms with intelligent result aggregation and deduplication.\n\n**Supported Platforms:**\n- **AppFlowy**: Database rows, pages, and documents\n- **Affine**: Documents, whiteboards, and databases\n- **Vector Database**: Semantic search across all ingested content\n- **Google Drive**: Files, documents, and folders\n\n**Key Features:**\n- **Multi-Platform Search**: Simultaneous search across all enabled platforms\n- **Intelligent Deduplication**: Remove duplicate content across platforms\n- **Priority Sources**: Boost results from specified platforms\n- **Relevance Ranking**: Smart scoring and result prioritization\n- **Analytics**: Comprehensive search performance tracking\n- **Flexible Configuration**: Enable/disable platforms per search\n\n**Search Modes:**\n- `comprehensive`: Search all enabled platforms (default)\n- `semantic_only`: Vector database semantic search only\n- `direct_only`: Platform-specific direct queries only\n- `hybrid`: Combination approach with relevance scoring\n\n**API Parameters:**\n- `query`: Search text/question\n- `platforms`: Array of platforms to search\n- `mode`: Search mode to use\n- `limit`: Maximum total results\n- `enableDeduplication`: Remove duplicate content\n- `prioritySources`: Platforms to prioritize in results\n- `enableAnalytics`: Track search performance\n\n**Response Format:**\n```json\n{\n  \"results\": [...],\n  \"analytics\": {...},\n  \"metadata\": {...}\n}\n```",
+        "height": 700,
+        "width": 800,
+        "color": 6
+      },
+      "id": "cross-platform-search-documentation",
+      "name": "Cross-Platform Search Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [100, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cross-Platform Search Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Cross-Platform Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Cross-Platform Query": {
+      "main": [
+        [
+          {
+            "node": "Check AppFlowy Enabled",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Affine Enabled",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Vector DB Enabled",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Google Drive Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check AppFlowy Enabled": {
+      "main": [
+        [
+          {
+            "node": "Query AppFlowy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Affine Enabled": {
+      "main": [
+        [
+          {
+            "node": "Query Affine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Vector DB Enabled": {
+      "main": [
+        [
+          {
+            "node": "Query Vector Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Google Drive Enabled": {
+      "main": [
+        [
+          {
+            "node": "Query Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Format Google Drive Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Google Drive Results": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Platform Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query AppFlowy": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Platform Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Affine": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Platform Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Vector Database": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Platform Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Platform Results": {
+      "main": [
+        [
+          {
+            "node": "Check Deduplication Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Deduplication Enabled": {
+      "main": [
+        [
+          {
+            "node": "Perform Deduplication",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finalize Cross-Platform Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perform Deduplication": {
+      "main": [
+        [
+          {
+            "node": "Finalize Cross-Platform Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Cross-Platform Results": {
+      "main": [
+        [
+          {
+            "node": "Check Analytics Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Analytics Enabled": {
+      "main": [
+        [
+          {
+            "node": "Log Cross-Platform Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare API Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Cross-Platform Analytics": {
+      "main": [
+        [
+          {
+            "node": "Prepare API Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare API Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Cross-Platform Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "cross-platform-search-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "CrossPlatformSearch",
+  "tags": ["cross-platform", "search", "aggregation", "deduplication", "knowledge-management"]
+}
