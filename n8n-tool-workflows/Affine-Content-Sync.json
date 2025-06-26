@@ -1,0 +1,678 @@
+{
+  "name": "Affine Content Sync to Vector Store",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "mode": "polling",
+        "options": {}
+      },
+      "id": "affine-polling-trigger",
+      "name": "Affine Polling Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://affine:3010/graphql",
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxAttempts": 3
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $vars.affine_api_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "query": "query GetWorkspaceDocuments($workspaceId: String!) { workspace(id: $workspaceId) { id name docs { id title content updatedAt createdAt } } }",
+          "variables": {
+            "workspaceId": "{{ $vars.affine_workspace_id }}"
+          }
+        }
+      },
+      "id": "fetch-affine-documents",
+      "name": "Fetch Affine Documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT document_id, content_hash FROM knowledge_sync_log WHERE source_system = 'affine' AND status = 'synced'",
+        "options": {}
+      },
+      "id": "get-existing-hashes",
+      "name": "Get Existing Hashes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [450, 500],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "existing-hashes-map",
+              "name": "existingHashes",
+              "value": "={{ $('Get Existing Hashes').all().reduce((acc, item) => { acc[item.document_id] = item.content_hash; return acc; }, {}) }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-hash-lookup",
+      "name": "Prepare Hash Lookup",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "documents-array",
+              "name": "documents",
+              "value": "={{ $json.data?.workspace?.docs || [] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-documents",
+      "name": "Extract Documents",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "documents",
+        "options": {}
+      },
+      "id": "split-documents",
+      "name": "Split Into Documents",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [950, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "content-processing",
+              "name": "content",
+              "value": "={{ $json.title ? $json.title + '\\n\\n' + ($json.content || 'No content available') : ($json.content || 'No content available') }}",
+              "type": "string"
+            },
+            {
+              "id": "content-hash",
+              "name": "contentHash",
+              "value": "={{ $crypto.createHash('md5').update($json.content || '').digest('hex') }}",
+              "type": "string"
+            },
+            {
+              "id": "document-id-affine",
+              "name": "document_id",
+              "value": "={{ 'affine_' + $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "metadata-affine",
+              "name": "metadata",
+              "value": "={{ { source: 'affine', type: 'document', doc_id: $json.id, workspace_id: $vars.affine_workspace_id, title: $json.title, created_at: $json.createdAt, updated_at: $json.updatedAt } }}",
+              "type": "object"
+            },
+            {
+              "id": "needs-update",
+              "name": "needsUpdate",
+              "value": "={{ $('Prepare Hash Lookup').item.json.existingHashes[$json.document_id] !== $json.contentHash }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-affine-document",
+      "name": "Process Affine Document",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "needs-update-condition",
+              "leftValue": "={{ $json.needsUpdate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-if-update-needed",
+      "name": "Check If Update Needed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "code": {
+          "execute": {
+            "code": "const { QdrantVectorStore } = require(\"@langchain/qdrant\");\nconst { OllamaEmbeddings } = require(\"@langchain/community/embeddings/ollama\");\n\nconst embeddings = new OllamaEmbeddings({\n  model: \"nomic-embed-text\",\n  baseUrl: \"http://ollama:11434\"\n});\n\nconst vectorStore = await QdrantVectorStore.fromExistingCollection(\n  embeddings,\n  {\n    url: \"http://qdrant:6333\",\n    collectionName: \"knowledge_base\",\n  }\n);\n\nconst documentIdToDelete = this.getInputData()[0].json.document_id;\n\nconst filter = {\n  must: [\n    {\n      key: \"metadata.document_id\",\n      match: {\n        value: documentIdToDelete,\n      },\n    },\n  ],\n};\n\n// Delete existing vectors for this document\ntry {\n  await vectorStore.client.delete(\"knowledge_base\", {\n    filter\n  });\n  console.log(`Cleared vectors for document: ${documentIdToDelete}`);\n} catch (error) {\n  console.log(`No existing vectors found for document: ${documentIdToDelete}`);\n}\n\nreturn [{ json: { document_id: documentIdToDelete, status: \"cleared\" } }];"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "main",
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "main"
+            }
+          ]
+        }
+      },
+      "id": "clear-existing-affine-vectors",
+      "name": "Clear Existing Affine Vectors",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [1700, 200]
+    },
+    {
+      "parameters": {
+        "chunkSize": 500,
+        "chunkOverlap": 50,
+        "options": {}
+      },
+      "id": "affine-text-splitter",
+      "name": "Affine Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [1950, 400]
+    },
+    {
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "={{ $('Process Affine Document').item.json.metadata.source }}"
+              },
+              {
+                "name": "type",
+                "value": "={{ $('Process Affine Document').item.json.metadata.type }}"
+              },
+              {
+                "name": "doc_id",
+                "value": "={{ $('Process Affine Document').item.json.metadata.doc_id }}"
+              },
+              {
+                "name": "document_id",
+                "value": "={{ $('Process Affine Document').item.json.document_id }}"
+              },
+              {
+                "name": "workspace_id",
+                "value": "={{ $('Process Affine Document').item.json.metadata.workspace_id }}"
+              },
+              {
+                "name": "title",
+                "value": "={{ $('Process Affine Document').item.json.metadata.title }}"
+              },
+              {
+                "name": "updated_at",
+                "value": "={{ $('Process Affine Document').item.json.metadata.updated_at }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "affine-document-loader",
+      "name": "Affine Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [1950, 200]
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest"
+      },
+      "id": "affine-embeddings-ollama",
+      "name": "Affine Embeddings Ollama",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [2200, 200],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama_credentials",
+          "name": "Ollama API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "knowledge_base",
+          "mode": "list",
+          "cachedResultName": "knowledge_base"
+        },
+        "options": {}
+      },
+      "id": "affine-qdrant-vector-store",
+      "name": "Affine Qdrant Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [2450, 200],
+      "credentials": {
+        "qdrantApi": {
+          "id": "qdrant_credentials",
+          "name": "Qdrant API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "table": {
+          "__rl": true,
+          "value": "knowledge_sync_log",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "document_id",
+              "value": "={{ $('Process Affine Document').item.json.document_id }}"
+            },
+            {
+              "column": "source_system",
+              "value": "affine"
+            },
+            {
+              "column": "source_id",
+              "value": "={{ $('Process Affine Document').item.json.metadata.doc_id }}"
+            },
+            {
+              "column": "content_hash",
+              "value": "={{ $('Process Affine Document').item.json.contentHash }}"
+            },
+            {
+              "column": "metadata",
+              "value": "={{ $('Process Affine Document').item.json.metadata }}"
+            },
+            {
+              "column": "sync_timestamp",
+              "value": "={{ $now }}"
+            },
+            {
+              "column": "status",
+              "value": "synced"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-affine-sync-status",
+      "name": "Log Affine Sync Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2700, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "affine-content-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "affine-webhook-trigger",
+      "name": "Affine Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 500],
+      "webhookId": "affine-content-webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "webhook-doc-id",
+              "name": "document_id",
+              "value": "={{ 'affine_' + $json.body.docId }}",
+              "type": "string"
+            },
+            {
+              "id": "webhook-workspace-id",
+              "name": "workspace_id",
+              "value": "={{ $json.body.workspaceId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-webhook-data",
+      "name": "Process Webhook Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 600]
+    },
+    {
+      "parameters": {
+        "url": "http://affine:3010/graphql",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $vars.affine_api_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "query": "query GetDocument($workspaceId: String!, $docId: String!) { workspace(id: $workspaceId) { doc(id: $docId) { id title content updatedAt createdAt } } }",
+          "variables": {
+            "workspaceId": "={{ $json.workspace_id }}",
+            "docId": "={{ $json.body.docId }}"
+          }
+        }
+      },
+      "id": "fetch-single-affine-document",
+      "name": "Fetch Single Affine Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 600]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-affine-webhook",
+      "name": "Respond to Affine Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [950, 600]
+    },
+    {
+      "parameters": {
+        "content": "## Affine Content Sync to Vector Store\n\n**Purpose:** Automatically sync Affine workspace documents to the central knowledge vector store.\n\n**Triggers:**\n- Scheduled polling (every minute)\n- Webhook notifications for real-time updates\n\n**Process:**\n1. Fetch documents from Affine GraphQL API\n2. Check existing content hashes to detect changes\n3. Process only new or updated documents\n4. Clear existing vectors for updated content\n5. Split content into chunks and generate embeddings\n6. Store in Qdrant vector database\n7. Log sync status to PostgreSQL\n\n**Note:** Uses internal GraphQL API - requires proper authentication",
+        "height": 450,
+        "width": 600,
+        "color": 5
+      },
+      "id": "affine-workflow-documentation",
+      "name": "Affine Workflow Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2800, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Affine Polling Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Affine Documents",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Existing Hashes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Affine Documents": {
+      "main": [
+        [
+          {
+            "node": "Extract Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Hashes": {
+      "main": [
+        [
+          {
+            "node": "Prepare Hash Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Hash Lookup": {
+      "main": [
+        [
+          {
+            "node": "Split Into Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Documents": {
+      "main": [
+        [
+          {
+            "node": "Split Into Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Documents": {
+      "main": [
+        [
+          {
+            "node": "Process Affine Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Affine Document": {
+      "main": [
+        [
+          {
+            "node": "Check If Update Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Update Needed": {
+      "main": [
+        [
+          {
+            "node": "Clear Existing Affine Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Existing Affine Vectors": {
+      "main": [
+        [
+          {
+            "node": "Affine Document Loader",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Affine Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Affine Document Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Affine Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Affine Qdrant Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Affine Embeddings Ollama": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Affine Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Affine Qdrant Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Log Affine Sync Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Affine Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Process Webhook Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Webhook Data": {
+      "main": [
+        [
+          {
+            "node": "Fetch Single Affine Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Single Affine Document": {
+      "main": [
+        [
+          {
+            "node": "Respond to Affine Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Process Affine Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "affine-sync-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "AffineContentSync",
+  "tags": ["knowledge-management", "affine", "vector-store", "sync"]
+}
