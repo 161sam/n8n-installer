@@ -1,0 +1,660 @@
+{
+  "name": "Enhanced RAG AI Agent with Knowledge Management",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "enhanced-postgres-chat-memory",
+      "name": "Enhanced Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.1,
+      "position": [1040, 560],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama3.1:latest",
+        "options": {}
+      },
+      "id": "enhanced-ollama-chat-model",
+      "name": "Enhanced Ollama Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [920, 560],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama_credentials",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama3.1:latest",
+        "options": {}
+      },
+      "id": "enhanced-ollama-model",
+      "name": "Enhanced Ollama Model",
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [1960, 500],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama_credentials",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "knowledge_base",
+        "description": "Search through the integrated knowledge base including AppFlowy pages, Affine documents, Google Drive files, and other synced content.",
+        "topK": 5
+      },
+      "id": "knowledge-base-vector-tool",
+      "name": "Knowledge Base Vector Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1,
+      "position": [1740, 340]
+    },
+    {
+      "parameters": {
+        "name": "appflowy_query",
+        "description": "Query AppFlowy databases and pages directly. Use this to get the latest information from AppFlowy workspaces."
+      },
+      "id": "appflowy-query-tool",
+      "name": "AppFlowy Query Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1740, 180]
+    },
+    {
+      "parameters": {
+        "name": "affine_query",
+        "description": "Query Affine documents and workspaces directly. Use this to get the latest information from Affine collaborative workspaces."
+      },
+      "id": "affine-query-tool",
+      "name": "Affine Query Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1740, 240]
+    },
+    {
+      "parameters": {
+        "name": "cross_platform_search",
+        "description": "Search across all knowledge management platforms (AppFlowy, Affine, Google Drive) for specific topics or keywords."
+      },
+      "id": "cross-platform-search-tool",
+      "name": "Cross-Platform Search Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [1740, 300]
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest"
+      },
+      "id": "enhanced-embeddings-ollama",
+      "name": "Enhanced Embeddings Ollama",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [1840, 600],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama_credentials",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "enhanced-chat-trigger",
+      "name": "Enhanced Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [620, 340],
+      "webhookId": "enhanced-chat-trigger"
+    },
+    {
+      "parameters": {
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "knowledge_base",
+          "mode": "list",
+          "cachedResultName": "knowledge_base"
+        },
+        "options": {}
+      },
+      "id": "enhanced-qdrant-vector-store",
+      "name": "Enhanced Qdrant Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [1560, 480],
+      "credentials": {
+        "qdrantApi": {
+          "id": "qdrant_credentials",
+          "name": "Qdrant API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "enhanced-respond-to-webhook",
+      "name": "Enhanced Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 340]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "enhanced-rag-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "enhanced-webhook",
+      "name": "Enhanced Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [620, 520],
+      "webhookId": "enhanced-rag-agent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are an enhanced AI assistant with access to a comprehensive knowledge management system. You can access information from:\n\n1. **AppFlowy**: Project management, notes, databases, and wikis\n2. **Affine**: Collaborative documents, whiteboards, and workspaces  \n3. **Google Drive**: Files, documents, and meeting notes\n4. **Vector Database**: Semantic search across all integrated content\n\nWhen answering questions:\n- Use the most relevant and up-to-date information from all available sources\n- Cite your sources when providing information (e.g., \"According to the AppFlowy project database...\")\n- If information is available in multiple sources, provide a comprehensive view\n- Suggest relevant actions or next steps when appropriate\n- If you need more specific information, use the appropriate query tools\n\nAlways be helpful, accurate, and provide context about where information comes from.",
+        "options": {
+          "systemMessage": "You are an enhanced knowledge management AI assistant with access to AppFlowy, Affine, Google Drive, and a comprehensive vector database. Always provide helpful, accurate responses with proper source attribution."
+        }
+      },
+      "id": "enhanced-ai-agent",
+      "name": "Enhanced AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [1000, 340]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "enhanced-chat-input",
+              "name": "chatInput",
+              "value": "={{ $json?.chatInput || $json.body?.chatInput || $json.body?.message || $json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "enhanced-session-id",
+              "name": "sessionId",
+              "value": "={{ $json?.sessionId || $json.body?.sessionId || 'default-session' }}",
+              "type": "string"
+            },
+            {
+              "id": "knowledge-context",
+              "name": "knowledgeContext",
+              "value": "={{ $json?.knowledge_context || $json.body?.knowledge_context || null }}",
+              "type": "object"
+            },
+            {
+              "id": "user-preferences",
+              "name": "userPreferences",
+              "value": "={{ { preferredSources: ['appflowy', 'affine', 'google_drive'], searchDepth: 'comprehensive', includeMetadata: true } }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "enhanced-edit-fields",
+      "name": "Enhanced Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [820, 340]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": {
+          "__rl": true,
+          "value": "chat_sessions",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "session_id",
+              "value": "={{ $('Enhanced Edit Fields').item.json.sessionId }}"
+            },
+            {
+              "column": "user_input",
+              "value": "={{ $('Enhanced Edit Fields').item.json.chatInput }}"
+            },
+            {
+              "column": "knowledge_context",
+              "value": "={{ $('Enhanced Edit Fields').item.json.knowledgeContext }}"
+            },
+            {
+              "column": "timestamp",
+              "value": "={{ $now }}"
+            },
+            {
+              "column": "response",
+              "value": "={{ $('Enhanced AI Agent').item.json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-chat-session",
+      "name": "Log Chat Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1200, 520],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Enhanced RAG AI Agent with Knowledge Management\n\n**Purpose:** Advanced AI assistant with integrated access to AppFlowy, Affine, Google Drive, and vector database.\n\n**Key Features:**\n- Semantic search across all knowledge sources\n- Direct query tools for AppFlowy and Affine\n- Cross-platform content correlation\n- Source attribution and metadata\n- Enhanced context awareness\n- Session logging and analytics\n\n**Tools Available:**\n1. Knowledge Base Vector Search\n2. AppFlowy Direct Query\n3. Affine Direct Query  \n4. Cross-Platform Search\n5. Google Drive Integration\n\n**Usage:**\n- Chat interface with natural language queries\n- Webhook API for integration with other systems\n- Supports complex multi-source research queries",
+        "height": 600,
+        "width": 700,
+        "color": 6
+      },
+      "id": "enhanced-workflow-documentation",
+      "name": "Enhanced Workflow Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [200, 100]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "query-classification",
+              "name": "queryType",
+              "value": "={{ $json.chatInput.toLowerCase().includes('appflowy') ? 'appflowy' : $json.chatInput.toLowerCase().includes('affine') ? 'affine' : $json.chatInput.toLowerCase().includes('document') || $json.chatInput.toLowerCase().includes('file') ? 'document' : 'general' }}",
+              "type": "string"
+            },
+            {
+              "id": "search-keywords",
+              "name": "searchKeywords",
+              "value": "={{ $json.chatInput.split(' ').filter(word => word.length > 3 && !['what', 'when', 'where', 'how', 'why', 'which', 'this', 'that', 'with', 'from', 'they', 'them', 'their', 'there', 'then'].includes(word.toLowerCase())) }}",
+              "type": "array"
+            },
+            {
+              "id": "requires-realtime",
+              "name": "requiresRealtime",
+              "value": "={{ $json.chatInput.toLowerCase().includes('latest') || $json.chatInput.toLowerCase().includes('current') || $json.chatInput.toLowerCase().includes('now') || $json.chatInput.toLowerCase().includes('today') }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "analyze-query-intent",
+      "name": "Analyze Query Intent",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [620, 680]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST", 
+        "path": "knowledge-update-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "knowledge-update-webhook",
+      "name": "Knowledge Update Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 800],
+      "webhookId": "knowledge-update-trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "update-source",
+              "name": "source",
+              "value": "={{ $json.body.source }}",
+              "type": "string"
+            },
+            {
+              "id": "update-type",
+              "name": "updateType",
+              "value": "={{ $json.body.updateType }}",
+              "type": "string"
+            },
+            {
+              "id": "document-id-update",
+              "name": "documentId",
+              "value": "={{ $json.body.documentId }}",
+              "type": "string"
+            },
+            {
+              "id": "trigger-resync",
+              "name": "triggerResync",
+              "value": "={{ $json.body.triggerResync || false }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-knowledge-update",
+      "name": "Process Knowledge Update",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 800]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "resync-condition",
+              "leftValue": "={{ $json.triggerResync }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-resync-needed",
+      "name": "Check Resync Needed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 800]
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.{{ $vars.domain_name }}/webhook/trigger-knowledge-sync",
+        "options": {
+          "timeout": 60000
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "source": "={{ $json.source }}",
+          "documentId": "={{ $json.documentId }}",
+          "updateType": "={{ $json.updateType }}",
+          "timestamp": "={{ $now }}"
+        }
+      },
+      "id": "trigger-knowledge-resync",
+      "name": "Trigger Knowledge Resync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [950, 700]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-knowledge-update",
+      "name": "Respond to Knowledge Update",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1200, 800]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Enhanced Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Ollama Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Knowledge Base Vector Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AppFlowy Query Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Affine Query Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Cross-Platform Search Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Embeddings Ollama": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Enhanced Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Qdrant Vector Store": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Knowledge Base Vector Tool",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Webhook": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Edit Fields",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Analyze Query Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Chat Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Base Vector Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AppFlowy Query Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Affine Query Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Cross-Platform Search Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Enhanced AI Agent",
+            "type": "ai_tool",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Knowledge Update Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Knowledge Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Knowledge Update": {
+      "main": [
+        [
+          {
+            "node": "Check Resync Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Resync Needed": {
+      "main": [
+        [
+          {
+            "node": "Trigger Knowledge Resync",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Knowledge Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Knowledge Resync": {
+      "main": [
+        [
+          {
+            "node": "Respond to Knowledge Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "enhanced-rag-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "enhanced-rag-agent"
+  },
+  "id": "EnhancedRAGAgent",
+  "tags": ["ai-agent", "rag", "knowledge-management", "enhanced", "appflowy", "affine"]
+}
