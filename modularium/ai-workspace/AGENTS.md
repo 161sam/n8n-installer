@@ -1,4 +1,4 @@
-# Guidance for Codex Agents (n8n-tool-workflows/)
+# Guidance for Codex Agents (modularium/ai-workspace/)
 
 This directory stores example n8n workflows in JSON format.  Some files have the extension `.json`, others `.md` but contain JSON.
 
