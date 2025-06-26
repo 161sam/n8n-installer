@@ -304,6 +304,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data:rw
       - caddy_config:/config:rw
+      - ./AI-Workspace-Portal.html:/usr/share/caddy/index.html:ro
     networks:
       - internal_network
     healthcheck:
