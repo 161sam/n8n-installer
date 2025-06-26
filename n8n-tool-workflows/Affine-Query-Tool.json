@@ -1,0 +1,647 @@
+{
+  "name": "Affine Direct Query Tool",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "affine-query-tool",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "affine-query-webhook",
+      "name": "Affine Query Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400],
+      "webhookId": "affine-query-tool"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "query-text-affine",
+              "name": "queryText",
+              "value": "={{ $json.body.query || $json.body.searchTerm || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "query-type-affine",
+              "name": "queryType",
+              "value": "={{ $json.body.queryType || 'semantic_search' }}",
+              "type": "string"
+            },
+            {
+              "id": "workspace-filter-affine",
+              "name": "workspaceFilter",
+              "value": "={{ $json.body.workspaceFilter || $vars.affine_workspace_id }}",
+              "type": "string"
+            },
+            {
+              "id": "doc-type-filter",
+              "name": "docTypeFilter",
+              "value": "={{ $json.body.docTypeFilter || ['document', 'whiteboard', 'database'] }}",
+              "type": "array"
+            },
+            {
+              "id": "result-limit-affine",
+              "name": "resultLimit",
+              "value": "={{ $json.body.limit || 10 }}",
+              "type": "number"
+            },
+            {
+              "id": "include-metadata-affine",
+              "name": "includeMetadata",
+              "value": "={{ $json.body.includeMetadata || true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "search-timestamp",
+              "name": "timestamp",
+              "value": "={{ $now }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-affine-query",
+      "name": "Process Affine Query",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "semantic-search-condition-affine",
+              "leftValue": "={{ $json.queryType }}",
+              "rightValue": "semantic_search",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-affine-query-type",
+      "name": "Check Affine Query Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "code": {
+          "execute": {
+            "code": "const { QdrantVectorStore } = require(\"@langchain/qdrant\");\nconst { OllamaEmbeddings } = require(\"@langchain/community/embeddings/ollama\");\n\nconst embeddings = new OllamaEmbeddings({\n  model: \"nomic-embed-text\",\n  baseUrl: \"http://ollama:11434\"\n});\n\nconst vectorStore = await QdrantVectorStore.fromExistingCollection(\n  embeddings,\n  {\n    url: \"http://qdrant:6333\",\n    collectionName: \"knowledge_base\",\n  }\n);\n\nconst queryText = this.getInputData()[0].json.queryText;\nconst resultLimit = this.getInputData()[0].json.resultLimit || 10;\n\n// Create filter for Affine content only\nconst filter = {\n  must: [\n    {\n      key: \"metadata.source\",\n      match: {\n        value: \"affine\",\n      },\n    },\n  ],\n};\n\n// Perform semantic search\nconst results = await vectorStore.similaritySearch(queryText, resultLimit, filter);\n\n// Format results\nconst formattedResults = results.map((doc, index) => ({\n  id: index,\n  content: doc.pageContent,\n  metadata: doc.metadata,\n  source: 'vector_search',\n  relevanceScore: doc.score || 0\n}));\n\nreturn [{ json: { results: formattedResults, queryType: 'semantic_search', totalResults: formattedResults.length } }];"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "main",
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "main"
+            }
+          ]
+        }
+      },
+      "id": "perform-affine-semantic-search",
+      "name": "Perform Affine Semantic Search",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [950, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://affine:3010/graphql",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $vars.affine_api_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "query": "query SearchWorkspace($workspaceId: String!, $searchTerm: String!) { workspace(id: $workspaceId) { id name docs { id title content updatedAt createdAt type } } }",
+          "variables": {
+            "workspaceId": "={{ $('Process Affine Query').item.json.workspaceFilter }}",
+            "searchTerm": "={{ $('Process Affine Query').item.json.queryText }}"
+          }
+        }
+      },
+      "id": "fetch-affine-workspace-docs",
+      "name": "Fetch Affine Workspace Docs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [950, 500]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "all-docs",
+              "name": "allDocs",
+              "value": "={{ $json.data?.workspace?.docs || [] }}",
+              "type": "array"
+            },
+            {
+              "id": "workspace-info",
+              "name": "workspaceInfo",
+              "value": "={{ { id: $json.data?.workspace?.id, name: $json.data?.workspace?.name } }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-affine-docs",
+      "name": "Extract Affine Docs",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1200, 500]
+    },
+    {
+      "parameters": {
+        "fieldsToSplitOut": "allDocs",
+        "options": {}
+      },
+      "id": "split-affine-docs",
+      "name": "Split Affine Docs",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1450, 500]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "filter-matching-docs",
+              "name": "matchesQuery",
+              "value": "={{ (() => {\n  const queryText = $('Process Affine Query').item.json.queryText.toLowerCase();\n  const docText = (($json.title || '') + ' ' + ($json.content || '')).toLowerCase();\n  return docText.includes(queryText);\n})() }}",
+              "type": "boolean"
+            },
+            {
+              "id": "doc-type-matches",
+              "name": "typeMatches",
+              "value": "={{ $('Process Affine Query').item.json.docTypeFilter.includes($json.type || 'document') }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-doc-relevance",
+      "name": "Check Doc Relevance",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1700, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "doc-matches-condition",
+              "leftValue": "={{ $json.matchesQuery }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "type-matches-condition",
+              "leftValue": "={{ $json.typeMatches }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-relevant-docs",
+      "name": "Filter Relevant Docs",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1950, 500]
+    },
+    {
+      "parameters": {
+        "url": "http://affine:3010/graphql",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $vars.affine_api_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "query": "query GetDocumentDetails($workspaceId: String!, $docId: String!) { workspace(id: $workspaceId) { doc(id: $docId) { id title content updatedAt createdAt type blocks { id type content properties } } } }",
+          "variables": {
+            "workspaceId": "={{ $('Extract Affine Docs').item.json.workspaceInfo.id }}",
+            "docId": "={{ $json.id }}"
+          }
+        }
+      },
+      "id": "get-detailed-doc-content",
+      "name": "Get Detailed Doc Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "format-affine-result",
+              "name": "formattedResult",
+              "value": "={{ {\n  id: $json.data.workspace.doc.id,\n  content: ($json.data.workspace.doc.title || '') + '\\n\\n' + ($json.data.workspace.doc.content || '') + (($json.data.workspace.doc.blocks || []).length > 0 ? '\\n\\nBlocks:\\n' + $json.data.workspace.doc.blocks.map(block => `${block.type}: ${block.content || ''}`).join('\\n') : ''),\n  metadata: {\n    source: 'affine',\n    type: $json.data.workspace.doc.type || 'document',\n    doc_id: $json.data.workspace.doc.id,\n    workspace_id: $('Extract Affine Docs').item.json.workspaceInfo.id,\n    workspace_name: $('Extract Affine Docs').item.json.workspaceInfo.name,\n    title: $json.data.workspace.doc.title,\n    created_at: $json.data.workspace.doc.createdAt,\n    updated_at: $json.data.workspace.doc.updatedAt,\n    block_count: ($json.data.workspace.doc.blocks || []).length\n  },\n  source: 'direct_query',\n  relevanceScore: (() => {\n    const queryText = $('Process Affine Query').item.json.queryText.toLowerCase();\n    const docText = (($json.data.workspace.doc.title || '') + ' ' + ($json.data.workspace.doc.content || '')).toLowerCase();\n    const matches = (docText.match(new RegExp(queryText, 'g')) || []).length;\n    return Math.min(matches / 10, 1.0); // Normalize to 0-1 range\n  })()\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-affine-query-result",
+      "name": "Format Affine Query Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2450, 400]
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "formattedResult"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aggregate-affine-results",
+      "name": "Aggregate Affine Results",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [2700, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "combine-affine-results",
+              "name": "allResults",
+              "value": "={{ [...($('Perform Affine Semantic Search').all().flatMap(item => item.results || [])), ...($('Aggregate Affine Results').all().flatMap(item => item.formattedResult || []))] }}",
+              "type": "array"
+            },
+            {
+              "id": "affine-query-summary",
+              "name": "querySummary",
+              "value": "={{ {\n  queryText: $('Process Affine Query').item.json.queryText,\n  queryType: $('Process Affine Query').item.json.queryType,\n  workspaceId: $('Process Affine Query').item.json.workspaceFilter,\n  totalResults: $json.allResults.length,\n  semanticResults: ($('Perform Affine Semantic Search').all().flatMap(item => item.results || [])).length,\n  directResults: ($('Aggregate Affine Results').all().flatMap(item => item.formattedResult || [])).length,\n  timestamp: $now\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "combine-affine-results",
+      "name": "Combine Affine Results",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2950, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ranked-affine-results",
+              "name": "rankedResults",
+              "value": "={{ $json.allResults.sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, $('Process Affine Query').item.json.resultLimit) }}",
+              "type": "array"
+            },
+            {
+              "id": "affine-response-metadata",
+              "name": "responseMetadata",
+              "value": "={{ {\n  queryProcessed: $json.querySummary.queryText,\n  resultsFound: $json.rankedResults.length,\n  queryType: $json.querySummary.queryType,\n  workspaceSearched: $json.querySummary.workspaceId,\n  includeMetadata: $('Process Affine Query').item.json.includeMetadata,\n  docTypesFiltered: $('Process Affine Query').item.json.docTypeFilter,\n  timestamp: $now\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "rank-affine-results",
+      "name": "Rank Affine Results",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [3200, 400]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": {
+          "__rl": true,
+          "value": "query_analytics",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "query_text",
+              "value": "={{ $('Process Affine Query').item.json.queryText }}"
+            },
+            {
+              "column": "query_type",
+              "value": "affine_direct"
+            },
+            {
+              "column": "results_count",
+              "value": "={{ $json.rankedResults.length }}"
+            },
+            {
+              "column": "response_time_ms",
+              "value": "={{ $now - $('Process Affine Query').item.json.timestamp }}"
+            },
+            {
+              "column": "query_metadata",
+              "value": "={{ $json.responseMetadata }}"
+            },
+            {
+              "column": "created_at",
+              "value": "={{ $now }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-affine-query-analytics",
+      "name": "Log Affine Query Analytics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3450, 600],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-affine-query",
+      "name": "Respond to Affine Query",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3450, 400]
+    },
+    {
+      "parameters": {
+        "content": "## Affine Direct Query Tool\n\n**Purpose:** Direct querying interface for Affine workspaces with GraphQL API integration and semantic search capabilities.\n\n**Features:**\n- **Semantic Search**: Vector-based similarity search using embeddings\n- **GraphQL Query**: Direct workspace and document querying\n- **Document Type Filtering**: Support for documents, whiteboards, databases\n- **Block-level Search**: Content analysis including Affine blocks\n- **Result Ranking**: Relevance scoring based on query matches\n- **Analytics**: Query performance tracking and usage analytics\n\n**Query Types:**\n- `semantic_search`: Vector similarity search (default)\n- `direct_query`: GraphQL-based workspace search\n- `hybrid`: Combination of both approaches\n\n**Supported Document Types:**\n- `document`: Regular text documents\n- `whiteboard`: Visual collaboration boards\n- `database`: Structured data tables\n\n**API Parameters:**\n- `query`: Search text/question\n- `queryType`: Type of search to perform\n- `workspaceFilter`: Target workspace ID\n- `docTypeFilter`: Document types to include\n- `limit`: Maximum results to return\n- `includeMetadata`: Include detailed metadata\n\n**Response Format:**\n```json\n{\n  \"rankedResults\": [...],\n  \"responseMetadata\": {...}\n}\n```",
+        "height": 650,
+        "width": 700,
+        "color": 5
+      },
+      "id": "affine-query-documentation",
+      "name": "Affine Query Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [100, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Affine Query Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Affine Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Affine Query": {
+      "main": [
+        [
+          {
+            "node": "Check Affine Query Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Affine Query Type": {
+      "main": [
+        [
+          {
+            "node": "Perform Affine Semantic Search",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Affine Workspace Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perform Affine Semantic Search": {
+      "main": [
+        [
+          {
+            "node": "Combine Affine Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Affine Workspace Docs": {
+      "main": [
+        [
+          {
+            "node": "Extract Affine Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Affine Docs": {
+      "main": [
+        [
+          {
+            "node": "Split Affine Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Affine Docs": {
+      "main": [
+        [
+          {
+            "node": "Check Doc Relevance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Doc Relevance": {
+      "main": [
+        [
+          {
+            "node": "Filter Relevant Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Relevant Docs": {
+      "main": [
+        [
+          {
+            "node": "Get Detailed Doc Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Detailed Doc Content": {
+      "main": [
+        [
+          {
+            "node": "Format Affine Query Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Affine Query Result": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Affine Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Affine Results": {
+      "main": [
+        [
+          {
+            "node": "Combine Affine Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Affine Results": {
+      "main": [
+        [
+          {
+            "node": "Rank Affine Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rank Affine Results": {
+      "main": [
+        [
+          {
+            "node": "Respond to Affine Query",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Affine Query Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "affine-query-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "AffineQueryTool",
+  "tags": ["affine", "query", "search", "tool", "semantic", "graphql"]
+}
