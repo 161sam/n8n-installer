@@ -1,0 +1,576 @@
+{
+  "name": "Knowledge Management Database Setup",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "setup-knowledge-database",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "database-setup-webhook",
+      "name": "Database Setup Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400],
+      "webhookId": "setup-knowledge-database"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "setup-mode",
+              "name": "setupMode",
+              "value": "={{ $json.body.mode || 'full' }}",
+              "type": "string"
+            },
+            {
+              "id": "force-recreate",
+              "name": "forceRecreate",
+              "value": "={{ $json.body.forceRecreate || false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "enable-extensions",
+              "name": "enableExtensions",
+              "value": "={{ $json.body.enableExtensions || true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "setup-timestamp",
+              "name": "timestamp",
+              "value": "={{ $now }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-setup-request",
+      "name": "Process Setup Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "extensions-enabled",
+              "leftValue": "={{ $json.enableExtensions }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-extensions-enabled",
+      "name": "Check Extensions Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Enable required PostgreSQL extensions\nCREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\nCREATE EXTENSION IF NOT EXISTS \"pgcrypto\";\nCREATE EXTENSION IF NOT EXISTS \"vector\";\nCREATE EXTENSION IF NOT EXISTS \"pg_trgm\";\nCREATE EXTENSION IF NOT EXISTS \"btree_gin\";\n\nSELECT 'Extensions enabled successfully' as status;",
+        "options": {}
+      },
+      "id": "enable-postgresql-extensions",
+      "name": "Enable PostgreSQL Extensions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [950, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Knowledge Sync Log Table\nCREATE TABLE IF NOT EXISTS knowledge_sync_log (\n  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n  document_id VARCHAR(255) NOT NULL,\n  source_system VARCHAR(50) NOT NULL,\n  source_id VARCHAR(255) NOT NULL,\n  content_hash VARCHAR(64) NOT NULL,\n  metadata JSONB DEFAULT '{}',\n  sync_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n  status VARCHAR(20) NOT NULL DEFAULT 'synced',\n  error_message TEXT,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\n);\n\n-- Indexes for performance\nCREATE INDEX IF NOT EXISTS idx_knowledge_sync_log_document_id ON knowledge_sync_log(document_id);\nCREATE INDEX IF NOT EXISTS idx_knowledge_sync_log_source_system ON knowledge_sync_log(source_system);\nCREATE INDEX IF NOT EXISTS idx_knowledge_sync_log_status ON knowledge_sync_log(status);\nCREATE INDEX IF NOT EXISTS idx_knowledge_sync_log_sync_timestamp ON knowledge_sync_log(sync_timestamp);\nCREATE INDEX IF NOT EXISTS idx_knowledge_sync_log_content_hash ON knowledge_sync_log(content_hash);\n\nSELECT 'knowledge_sync_log table created' as status;",
+        "options": {}
+      },
+      "id": "create-knowledge-sync-log",
+      "name": "Create Knowledge Sync Log",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [950, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Knowledge Sync Mapping Table\nCREATE TABLE IF NOT EXISTS knowledge_sync_mapping (\n  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n  source_system VARCHAR(50) NOT NULL,\n  source_id VARCHAR(255) NOT NULL,\n  target_system VARCHAR(50) NOT NULL,\n  target_id VARCHAR(255) NOT NULL,\n  mapping_type VARCHAR(50) NOT NULL DEFAULT 'document',\n  sync_direction VARCHAR(20) NOT NULL DEFAULT 'bidirectional',\n  status VARCHAR(20) NOT NULL DEFAULT 'active',\n  metadata JSONB DEFAULT '{}',\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n  UNIQUE(source_system, source_id, target_system, target_id)\n);\n\n-- Indexes\nCREATE INDEX IF NOT EXISTS idx_knowledge_sync_mapping_source ON knowledge_sync_mapping(source_system, source_id);\nCREATE INDEX IF NOT EXISTS idx_knowledge_sync_mapping_target ON knowledge_sync_mapping(target_system, target_id);\nCREATE INDEX IF NOT EXISTS idx_knowledge_sync_mapping_status ON knowledge_sync_mapping(status);\n\nSELECT 'knowledge_sync_mapping table created' as status;",
+        "options": {}
+      },
+      "id": "create-sync-mapping-table",
+      "name": "Create Sync Mapping Table",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1200, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Chat Sessions Table\nCREATE TABLE IF NOT EXISTS chat_sessions (\n  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n  session_id VARCHAR(255) NOT NULL,\n  user_input TEXT NOT NULL,\n  response TEXT,\n  knowledge_context JSONB DEFAULT '{}',\n  metadata JSONB DEFAULT '{}',\n  timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n  processing_time_ms INTEGER,\n  tokens_used INTEGER,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\n);\n\n-- Indexes\nCREATE INDEX IF NOT EXISTS idx_chat_sessions_session_id ON chat_sessions(session_id);\nCREATE INDEX IF NOT EXISTS idx_chat_sessions_timestamp ON chat_sessions(timestamp);\nCREATE INDEX IF NOT EXISTS idx_chat_sessions_user_input_gin ON chat_sessions USING GIN (to_tsvector('english', user_input));\n\nSELECT 'chat_sessions table created' as status;",
+        "options": {}
+      },
+      "id": "create-chat-sessions-table",
+      "name": "Create Chat Sessions Table",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1200, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Query Analytics Table\nCREATE TABLE IF NOT EXISTS query_analytics (\n  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n  query_text TEXT NOT NULL,\n  query_type VARCHAR(50) NOT NULL,\n  results_count INTEGER NOT NULL DEFAULT 0,\n  response_time_ms INTEGER,\n  query_metadata JSONB DEFAULT '{}',\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\n);\n\n-- Indexes\nCREATE INDEX IF NOT EXISTS idx_query_analytics_query_type ON query_analytics(query_type);\nCREATE INDEX IF NOT EXISTS idx_query_analytics_created_at ON query_analytics(created_at);\nCREATE INDEX IF NOT EXISTS idx_query_analytics_query_text_gin ON query_analytics USING GIN (to_tsvector('english', query_text));\n\nSELECT 'query_analytics table created' as status;",
+        "options": {}
+      },
+      "id": "create-query-analytics-table",
+      "name": "Create Query Analytics Table",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1200, 500],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Cross-Platform Search Analytics Table\nCREATE TABLE IF NOT EXISTS cross_platform_search_analytics (\n  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n  query_text TEXT NOT NULL,\n  search_mode VARCHAR(50) NOT NULL,\n  platforms_searched TEXT[] NOT NULL,\n  total_results INTEGER NOT NULL DEFAULT 0,\n  platform_breakdown JSONB DEFAULT '{}',\n  processing_time_ms INTEGER,\n  deduplication_enabled BOOLEAN DEFAULT true,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\n);\n\n-- Indexes\nCREATE INDEX IF NOT EXISTS idx_cross_platform_search_mode ON cross_platform_search_analytics(search_mode);\nCREATE INDEX IF NOT EXISTS idx_cross_platform_search_created_at ON cross_platform_search_analytics(created_at);\nCREATE INDEX IF NOT EXISTS idx_cross_platform_search_platforms ON cross_platform_search_analytics USING GIN (platforms_searched);\n\nSELECT 'cross_platform_search_analytics table created' as status;",
+        "options": {}
+      },
+      "id": "create-cross-platform-analytics",
+      "name": "Create Cross-Platform Analytics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Bidirectional Sync Log Table\nCREATE TABLE IF NOT EXISTS bidirectional_sync_log (\n  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n  sync_session_id VARCHAR(255) NOT NULL,\n  source_system VARCHAR(50),\n  items_synced INTEGER NOT NULL DEFAULT 0,\n  sync_direction VARCHAR(20) NOT NULL DEFAULT 'bidirectional',\n  status VARCHAR(20) NOT NULL DEFAULT 'in_progress',\n  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n  completed_at TIMESTAMPTZ,\n  errors JSONB DEFAULT '[]',\n  metadata JSONB DEFAULT '{}'\n);\n\n-- Indexes\nCREATE INDEX IF NOT EXISTS idx_bidirectional_sync_session_id ON bidirectional_sync_log(sync_session_id);\nCREATE INDEX IF NOT EXISTS idx_bidirectional_sync_status ON bidirectional_sync_log(status);\nCREATE INDEX IF NOT EXISTS idx_bidirectional_sync_started_at ON bidirectional_sync_log(started_at);\n\nSELECT 'bidirectional_sync_log table created' as status;",
+        "options": {}
+      },
+      "id": "create-bidirectional-sync-log",
+      "name": "Create Bidirectional Sync Log",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1450, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Orchestration Log Table\nCREATE TABLE IF NOT EXISTS orchestration_log (\n  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n  session_id VARCHAR(255) NOT NULL,\n  mode VARCHAR(50) NOT NULL,\n  target_systems TEXT[] NOT NULL,\n  maintenance_performed BOOLEAN DEFAULT false,\n  sync_triggered BOOLEAN DEFAULT false,\n  system_health JSONB DEFAULT '{}',\n  orchestration_summary JSONB DEFAULT '{}',\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\n);\n\n-- Indexes\nCREATE INDEX IF NOT EXISTS idx_orchestration_log_session_id ON orchestration_log(session_id);\nCREATE INDEX IF NOT EXISTS idx_orchestration_log_mode ON orchestration_log(mode);\nCREATE INDEX IF NOT EXISTS idx_orchestration_log_created_at ON orchestration_log(created_at);\n\nSELECT 'orchestration_log table created' as status;",
+        "options": {}
+      },
+      "id": "create-orchestration-log",
+      "name": "Create Orchestration Log",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1450, 500],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Deep Analysis Reports Table\nCREATE TABLE IF NOT EXISTS deep_analysis_reports (\n  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n  analysis_timestamp VARCHAR(255) NOT NULL,\n  analysis_type VARCHAR(100) NOT NULL,\n  findings TEXT,\n  recommendations JSONB DEFAULT '[]',\n  metadata JSONB DEFAULT '{}',\n  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\n);\n\n-- Indexes\nCREATE INDEX IF NOT EXISTS idx_deep_analysis_type ON deep_analysis_reports(analysis_type);\nCREATE INDEX IF NOT EXISTS idx_deep_analysis_timestamp ON deep_analysis_reports(analysis_timestamp);\nCREATE INDEX IF NOT EXISTS idx_deep_analysis_created_at ON deep_analysis_reports(created_at);\nCREATE INDEX IF NOT EXISTS idx_deep_analysis_findings_gin ON deep_analysis_reports USING GIN (to_tsvector('english', findings));\n\nSELECT 'deep_analysis_reports table created' as status;",
+        "options": {}
+      },
+      "id": "create-deep-analysis-reports",
+      "name": "Create Deep Analysis Reports",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1700, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Create useful views for analytics and reporting\n\n-- View: Recent Knowledge Activity\nCREATE OR REPLACE VIEW recent_knowledge_activity AS\nSELECT \n  source_system,\n  source_id,\n  document_id,\n  status,\n  sync_timestamp,\n  metadata->>'title' as title,\n  metadata->>'type' as content_type\nFROM knowledge_sync_log \nWHERE sync_timestamp >= NOW() - INTERVAL '24 hours'\nORDER BY sync_timestamp DESC;\n\n-- View: Platform Health Summary\nCREATE OR REPLACE VIEW platform_health_summary AS\nSELECT \n  source_system,\n  COUNT(*) as total_documents,\n  COUNT(CASE WHEN status = 'synced' THEN 1 END) as synced_documents,\n  COUNT(CASE WHEN status = 'error' THEN 1 END) as error_documents,\n  MAX(sync_timestamp) as last_sync,\n  ROUND(\n    (COUNT(CASE WHEN status = 'synced' THEN 1 END)::FLOAT / COUNT(*)) * 100, 2\n  ) as sync_success_rate\nFROM knowledge_sync_log \nWHERE sync_timestamp >= NOW() - INTERVAL '7 days'\nGROUP BY source_system;\n\n-- View: Search Analytics Summary\nCREATE OR REPLACE VIEW search_analytics_summary AS\nSELECT \n  query_type,\n  COUNT(*) as total_queries,\n  AVG(results_count) as avg_results,\n  AVG(response_time_ms) as avg_response_time_ms,\n  DATE_TRUNC('hour', created_at) as hour_bucket\nFROM query_analytics \nWHERE created_at >= NOW() - INTERVAL '24 hours'\nGROUP BY query_type, DATE_TRUNC('hour', created_at)\nORDER BY hour_bucket DESC;\n\nSELECT 'Analytics views created successfully' as status;",
+        "options": {}
+      },
+      "id": "create-analytics-views",
+      "name": "Create Analytics Views",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1700, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Create triggers for automatic timestamp updates\n\nCREATE OR REPLACE FUNCTION update_updated_at_column()\nRETURNS TRIGGER AS $$\nBEGIN\n  NEW.updated_at = NOW();\n  RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\n-- Apply to tables with updated_at columns\nDROP TRIGGER IF EXISTS update_knowledge_sync_log_updated_at ON knowledge_sync_log;\nCREATE TRIGGER update_knowledge_sync_log_updated_at\n  BEFORE UPDATE ON knowledge_sync_log\n  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();\n\nDROP TRIGGER IF EXISTS update_knowledge_sync_mapping_updated_at ON knowledge_sync_mapping;\nCREATE TRIGGER update_knowledge_sync_mapping_updated_at\n  BEFORE UPDATE ON knowledge_sync_mapping\n  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();\n\nSELECT 'Database triggers created successfully' as status;",
+        "options": {}
+      },
+      "id": "create-database-triggers",
+      "name": "Create Database Triggers",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1700, 500],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "setup-summary",
+              "name": "setupSummary",
+              "value": "={{ {\n  setupMode: $('Process Setup Request').item.json.setupMode,\n  timestamp: $('Process Setup Request').item.json.timestamp,\n  extensionsEnabled: $('Process Setup Request').item.json.enableExtensions,\n  tablesCreated: [\n    'knowledge_sync_log',\n    'knowledge_sync_mapping', \n    'chat_sessions',\n    'query_analytics',\n    'cross_platform_search_analytics',\n    'bidirectional_sync_log',\n    'orchestration_log',\n    'deep_analysis_reports'\n  ],\n  viewsCreated: [\n    'recent_knowledge_activity',\n    'platform_health_summary',\n    'search_analytics_summary'\n  ],\n  triggersCreated: [\n    'update_knowledge_sync_log_updated_at',\n    'update_knowledge_sync_mapping_updated_at'\n  ],\n  status: 'completed',\n  completedAt: $now\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "compile-setup-summary",
+      "name": "Compile Setup Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1950, 400]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": {
+          "__rl": true,
+          "value": "orchestration_log",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "session_id",
+              "value": "database_setup_{{ $('Process Setup Request').item.json.timestamp }}"
+            },
+            {
+              "column": "mode",
+              "value": "database_setup"
+            },
+            {
+              "column": "target_systems",
+              "value": "{{ ['postgresql', 'knowledge_management'] }}"
+            },
+            {
+              "column": "maintenance_performed",
+              "value": true
+            },
+            {
+              "column": "sync_triggered",
+              "value": false
+            },
+            {
+              "column": "system_health",
+              "value": "{{ { database: 'healthy', setup_completed: true } }}"
+            },
+            {
+              "column": "orchestration_summary",
+              "value": "={{ $json.setupSummary }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-setup-completion",
+      "name": "Log Setup Completion",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2200, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-setup-request",
+      "name": "Respond to Setup Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2450, 400]
+    },
+    {
+      "parameters": {
+        "content": "## Knowledge Management Database Setup\n\n**Purpose:** Initialize all required database tables, indexes, views, and triggers for the comprehensive knowledge management system.\n\n**Database Schema:**\n\n**Core Tables:**\n- `knowledge_sync_log`: Track all sync operations and content changes\n- `knowledge_sync_mapping`: Bidirectional mappings between platforms\n- `chat_sessions`: AI agent conversation history and context\n- `query_analytics`: Search performance and usage analytics\n- `cross_platform_search_analytics`: Multi-platform search metrics\n- `bidirectional_sync_log`: Sync session tracking and status\n- `orchestration_log`: System orchestration and health monitoring\n- `deep_analysis_reports`: AI-generated insights and recommendations\n\n**Analytics Views:**\n- `recent_knowledge_activity`: 24-hour activity summary\n- `platform_health_summary`: Per-platform sync success rates\n- `search_analytics_summary`: Hourly search performance metrics\n\n**Database Features:**\n- **pgvector Extension**: Vector similarity search support\n- **Full-Text Search**: GIN indexes for content search\n- **UUID Primary Keys**: Globally unique identifiers\n- **JSONB Metadata**: Flexible schema evolution\n- **Automatic Timestamps**: Trigger-based update tracking\n- **Performance Indexes**: Optimized for common queries\n\n**Setup Modes:**\n- `full`: Complete setup with all tables and features\n- `minimal`: Core tables only\n- `analytics_only`: Analytics tables and views only\n\n**API Parameters:**\n- `mode`: Setup mode to execute\n- `forceRecreate`: Drop and recreate existing tables\n- `enableExtensions`: Install PostgreSQL extensions\n\n**Post-Setup:**\nAfter running this setup, all knowledge management workflows will have the required database schema for proper operation.",
+        "height": 750,
+        "width": 800,
+        "color": 2
+      },
+      "id": "database-setup-documentation",
+      "name": "Database Setup Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [100, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Database Setup Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Setup Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Setup Request": {
+      "main": [
+        [
+          {
+            "node": "Check Extensions Enabled",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create Knowledge Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Extensions Enabled": {
+      "main": [
+        [
+          {
+            "node": "Enable PostgreSQL Extensions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enable PostgreSQL Extensions": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Mapping Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Knowledge Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Mapping Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Sync Mapping Table": {
+      "main": [
+        [
+          {
+            "node": "Create Chat Sessions Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Chat Sessions Table": {
+      "main": [
+        [
+          {
+            "node": "Create Query Analytics Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Query Analytics Table": {
+      "main": [
+        [
+          {
+            "node": "Create Cross-Platform Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Cross-Platform Analytics": {
+      "main": [
+        [
+          {
+            "node": "Create Bidirectional Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Bidirectional Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Create Orchestration Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Orchestration Log": {
+      "main": [
+        [
+          {
+            "node": "Create Deep Analysis Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Deep Analysis Reports": {
+      "main": [
+        [
+          {
+            "node": "Create Analytics Views",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Analytics Views": {
+      "main": [
+        [
+          {
+            "node": "Create Database Triggers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Database Triggers": {
+      "main": [
+        [
+          {
+            "node": "Compile Setup Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Setup Summary": {
+      "main": [
+        [
+          {
+            "node": "Log Setup Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Setup Completion": {
+      "main": [
+        [
+          {
+            "node": "Respond to Setup Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "database-setup-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "DatabaseSetup",
+  "tags": ["database", "setup", "postgresql", "schema", "knowledge-management"]
+}
