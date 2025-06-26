@@ -1,0 +1,728 @@
+{
+  "name": "Google Drive Knowledge Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "{{ $vars.google_drive_knowledge_folder_id }}",
+          "mode": "list",
+          "cachedResultName": "Knowledge Base",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/{{ $vars.google_drive_knowledge_folder_id }}"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "id": "google-drive-file-created",
+      "name": "Google Drive File Created",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google_drive_credentials",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "{{ $vars.google_drive_knowledge_folder_id }}",
+          "mode": "list",
+          "cachedResultName": "Knowledge Base",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/{{ $vars.google_drive_knowledge_folder_id }}"
+        },
+        "event": "fileUpdated",
+        "options": {}
+      },
+      "id": "google-drive-file-updated",
+      "name": "Google Drive File Updated",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [200, 500],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google_drive_credentials",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "extract-file-info",
+              "name": "fileInfo",
+              "value": "={{ { id: $json.id, name: $json.name, mimeType: $json.mimeType, modifiedTime: $json.modifiedTime, createdTime: $json.createdTime, size: $json.size, webViewLink: $json.webViewLink, parents: $json.parents } }}",
+              "type": "object"
+            },
+            {
+              "id": "document-id-gdrive",
+              "name": "document_id",
+              "value": "={{ 'google_drive_' + $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "is-supported-type",
+              "name": "isSupportedType",
+              "value": "={{ ['application/vnd.google-apps.document', 'application/vnd.google-apps.presentation', 'application/vnd.google-apps.spreadsheet', 'application/pdf', 'text/plain', 'text/markdown', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes($json.mimeType) }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-google-drive-file",
+      "name": "Process Google Drive File",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "supported-file-type",
+              "leftValue": "={{ $json.isSupportedType }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-supported-file-type",
+      "name": "Check Supported File Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "code": {
+          "execute": {
+            "code": "const { QdrantVectorStore } = require(\"@langchain/qdrant\");\nconst { OllamaEmbeddings } = require(\"@langchain/community/embeddings/ollama\");\n\nconst embeddings = new OllamaEmbeddings({\n  model: \"nomic-embed-text\",\n  baseUrl: \"http://ollama:11434\"\n});\n\nconst vectorStore = await QdrantVectorStore.fromExistingCollection(\n  embeddings,\n  {\n    url: \"http://qdrant:6333\",\n    collectionName: \"knowledge_base\",\n  }\n);\n\nconst documentIdToDelete = this.getInputData()[0].json.document_id;\n\nconst filter = {\n  must: [\n    {\n      key: \"metadata.document_id\",\n      match: {\n        value: documentIdToDelete,\n      },\n    },\n  ],\n};\n\n// Delete existing vectors for this document\ntry {\n  await vectorStore.client.delete(\"knowledge_base\", {\n    filter\n  });\n  console.log(`Cleared vectors for Google Drive document: ${documentIdToDelete}`);\n} catch (error) {\n  console.log(`No existing vectors found for document: ${documentIdToDelete}`);\n}\n\nreturn [{ json: { document_id: documentIdToDelete, status: \"cleared\" } }];"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "main",
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "main"
+            }
+          ]
+        }
+      },
+      "id": "clear-existing-google-drive-vectors",
+      "name": "Clear Existing Google Drive Vectors",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [950, 300]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Process Google Drive File').item.json.fileInfo.id }}",
+          "mode": "id"
+        },
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "text/plain",
+              "sheetsToFormat": "text/csv",
+              "slidesToFormat": "text/plain"
+            }
+          }
+        }
+      },
+      "id": "download-google-drive-file",
+      "name": "Download Google Drive File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [950, 500],
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google_drive_credentials",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "id": "extract-google-drive-text",
+      "name": "Extract Google Drive Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [1200, 500],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "enhanced-content",
+              "name": "enhancedContent",
+              "value": "={{ $('Process Google Drive File').item.json.fileInfo.name + '\\n\\n' + ($json.data || 'No content extracted') + '\\n\\nFile Details:\\n' + 'Type: ' + $('Process Google Drive File').item.json.fileInfo.mimeType + '\\n' + 'Created: ' + $('Process Google Drive File').item.json.fileInfo.createdTime + '\\n' + 'Modified: ' + $('Process Google Drive File').item.json.fileInfo.modifiedTime + '\\n' + 'Size: ' + ($('Process Google Drive File').item.json.fileInfo.size || 'Unknown') + ' bytes' }}",
+              "type": "string"
+            },
+            {
+              "id": "enhanced-metadata",
+              "name": "enhancedMetadata",
+              "value": "={{ { source: 'google_drive', type: 'file', document_id: $('Process Google Drive File').item.json.document_id, file_id: $('Process Google Drive File').item.json.fileInfo.id, file_name: $('Process Google Drive File').item.json.fileInfo.name, mime_type: $('Process Google Drive File').item.json.fileInfo.mimeType, created_time: $('Process Google Drive File').item.json.fileInfo.createdTime, modified_time: $('Process Google Drive File').item.json.fileInfo.modifiedTime, file_size: $('Process Google Drive File').item.json.fileInfo.size, web_view_link: $('Process Google Drive File').item.json.fileInfo.webViewLink, folder_ids: $('Process Google Drive File').item.json.fileInfo.parents, extraction_timestamp: $now } }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "enhance-google-drive-content",
+      "name": "Enhance Google Drive Content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "chunkSize": 800,
+        "chunkOverlap": 100,
+        "options": {}
+      },
+      "id": "google-drive-text-splitter",
+      "name": "Google Drive Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [1700, 600]
+    },
+    {
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "={{ $('Enhance Google Drive Content').item.json.enhancedMetadata.source }}"
+              },
+              {
+                "name": "type",
+                "value": "={{ $('Enhance Google Drive Content').item.json.enhancedMetadata.type }}"
+              },
+              {
+                "name": "document_id",
+                "value": "={{ $('Enhance Google Drive Content').item.json.enhancedMetadata.document_id }}"
+              },
+              {
+                "name": "file_id",
+                "value": "={{ $('Enhance Google Drive Content').item.json.enhancedMetadata.file_id }}"
+              },
+              {
+                "name": "file_name",
+                "value": "={{ $('Enhance Google Drive Content').item.json.enhancedMetadata.file_name }}"
+              },
+              {
+                "name": "mime_type",
+                "value": "={{ $('Enhance Google Drive Content').item.json.enhancedMetadata.mime_type }}"
+              },
+              {
+                "name": "modified_time",
+                "value": "={{ $('Enhance Google Drive Content').item.json.enhancedMetadata.modified_time }}"
+              },
+              {
+                "name": "web_view_link",
+                "value": "={{ $('Enhance Google Drive Content').item.json.enhancedMetadata.web_view_link }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "google-drive-document-loader",
+      "name": "Google Drive Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [1700, 400]
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest"
+      },
+      "id": "google-drive-embeddings",
+      "name": "Google Drive Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [1950, 400],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama_credentials",
+          "name": "Ollama API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "knowledge_base",
+          "mode": "list",
+          "cachedResultName": "knowledge_base"
+        },
+        "options": {}
+      },
+      "id": "google-drive-qdrant-insert",
+      "name": "Google Drive Qdrant Insert",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1,
+      "position": [2200, 400],
+      "credentials": {
+        "qdrantApi": {
+          "id": "qdrant_credentials",
+          "name": "Qdrant API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "table": {
+          "__rl": true,
+          "value": "knowledge_sync_log",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "document_id",
+              "value": "={{ $('Process Google Drive File').item.json.document_id }}"
+            },
+            {
+              "column": "source_system",
+              "value": "google_drive"
+            },
+            {
+              "column": "source_id",
+              "value": "={{ $('Process Google Drive File').item.json.fileInfo.id }}"
+            },
+            {
+              "column": "content_hash",
+              "value": "={{ $crypto.createHash('md5').update($('Enhance Google Drive Content').item.json.enhancedContent).digest('hex') }}"
+            },
+            {
+              "column": "metadata",
+              "value": "={{ $('Enhance Google Drive Content').item.json.enhancedMetadata }}"
+            },
+            {
+              "column": "sync_timestamp",
+              "value": "={{ $now }}"
+            },
+            {
+              "column": "status",
+              "value": "synced"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-google-drive-sync",
+      "name": "Log Google Drive Sync",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2450, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "enable-cross-sync",
+              "leftValue": "={{ $vars.enable_google_drive_cross_sync || false }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-cross-sync-enabled",
+      "name": "Check Cross-Sync Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2700, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.{{ $vars.domain_name }}/webhook/trigger-knowledge-sync",
+        "options": {
+          "timeout": 60000
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "source": "google_drive",
+          "documentId": "={{ $('Process Google Drive File').item.json.document_id }}",
+          "updateType": "file_sync",
+          "triggerBidirectional": true,
+          "metadata": "={{ $('Enhance Google Drive Content').item.json.enhancedMetadata }}"
+        }
+      },
+      "id": "trigger-cross-platform-sync",
+      "name": "Trigger Cross-Platform Sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2950, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "google-drive-webhook-sync",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "google-drive-webhook",
+      "name": "Google Drive Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 700],
+      "webhookId": "google-drive-webhook-sync"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "webhook-file-id",
+              "name": "fileId",
+              "value": "={{ $json.body.fileId || $json.body.file_id }}",
+              "type": "string"
+            },
+            {
+              "id": "webhook-action",
+              "name": "action",
+              "value": "={{ $json.body.action || 'sync' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-webhook-request",
+      "name": "Process Webhook Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 700]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.fileId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "get-webhook-file-details",
+      "name": "Get Webhook File Details",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [700, 700],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google_drive_credentials",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-google-drive-webhook",
+      "name": "Respond to Google Drive Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [950, 700]
+    },
+    {
+      "parameters": {
+        "content": "## Enhanced Google Drive Knowledge Sync\n\n**Purpose:** Comprehensive integration of Google Drive files into the knowledge management ecosystem with automatic content extraction and cross-platform synchronization.\n\n**Supported File Types:**\n- Google Docs (converted to plain text)\n- Google Sheets (converted to CSV)\n- Google Slides (converted to plain text)\n- PDF files\n- Plain text files\n- Markdown files\n- Word documents (.docx)\n\n**Key Features:**\n- **Automatic Detection**: Monitors specified Google Drive folders for new/updated files\n- **Content Extraction**: Intelligent text extraction based on file type\n- **Vector Indexing**: Automatic embedding generation and storage in Qdrant\n- **Metadata Enrichment**: Comprehensive file metadata and linking information\n- **Cross-Platform Sync**: Optional bidirectional sync with AppFlowy/Affine\n- **Webhook Support**: Manual trigger capability for specific files\n- **Duplicate Handling**: Automatic cleanup of existing vectors before re-indexing\n\n**Workflow Triggers:**\n1. **File Created**: New files added to monitored folders\n2. **File Updated**: Existing files modified in monitored folders\n3. **Webhook**: Manual sync trigger for specific files\n\n**Configuration:**\n- Set `google_drive_knowledge_folder_id` variable for folder monitoring\n- Enable `enable_google_drive_cross_sync` for bidirectional platform sync\n- Configure supported MIME types as needed\n\n**Integration Points:**\n- Vector Database (Qdrant) for semantic search\n- Knowledge Sync Log for tracking and analytics\n- Cross-Platform Sync for content distribution\n- Enhanced RAG Agent for intelligent querying\n\n**API Webhooks:**\n- POST /webhook/google-drive-webhook-sync\n- Parameters: fileId, action",
+        "height": 800,
+        "width": 800,
+        "color": 3
+      },
+      "id": "google-drive-sync-documentation",
+      "name": "Google Drive Sync Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [3200, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Drive File Created": {
+      "main": [
+        [
+          {
+            "node": "Process Google Drive File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive File Updated": {
+      "main": [
+        [
+          {
+            "node": "Process Google Drive File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Google Drive File": {
+      "main": [
+        [
+          {
+            "node": "Check Supported File Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Supported File Type": {
+      "main": [
+        [
+          {
+            "node": "Clear Existing Google Drive Vectors",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Download Google Drive File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Existing Google Drive Vectors": {
+      "main": [
+        [
+          {
+            "node": "Enhance Google Drive Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Google Drive File": {
+      "main": [
+        [
+          {
+            "node": "Extract Google Drive Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Google Drive Text": {
+      "main": [
+        [
+          {
+            "node": "Enhance Google Drive Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhance Google Drive Content": {
+      "main": [
+        [
+          {
+            "node": "Google Drive Document Loader",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Google Drive Document Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Google Drive Qdrant Insert",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Google Drive Qdrant Insert",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Qdrant Insert": {
+      "main": [
+        [
+          {
+            "node": "Log Google Drive Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Google Drive Sync": {
+      "main": [
+        [
+          {
+            "node": "Check Cross-Sync Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Cross-Sync Enabled": {
+      "main": [
+        [
+          {
+            "node": "Trigger Cross-Platform Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Webhook Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Webhook Request": {
+      "main": [
+        [
+          {
+            "node": "Get Webhook File Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Webhook File Details": {
+      "main": [
+        [
+          {
+            "node": "Respond to Google Drive Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Process Google Drive File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "google-drive-sync-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "GoogleDriveKnowledgeSync",
+  "tags": ["google-drive", "knowledge-management", "sync", "vector-store", "content-extraction"]
+}
