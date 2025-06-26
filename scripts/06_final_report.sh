@@ -1010,6 +1010,8 @@ show_quick_access_guide() {
     echo "───────────────────────────"
     local domain="${USER_DOMAIN_NAME:-localhost}"
     local protocol=$([ "$domain" != "localhost" ] && echo "https" || echo "http")
+    local portal_url="$protocol://$domain"
+    echo "   🚀 Workspace Portal: $portal_url"
     
     if is_profile_active "n8n"; then
         local n8n_url="$protocol://${N8N_HOSTNAME:-localhost:5678}"

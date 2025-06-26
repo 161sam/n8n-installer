@@ -506,3 +506,12 @@ rate_limit {
 }
 
 respond @blocked_patterns "Forbidden" 403
+
+# =============================================================================
+# AI WORKSPACE PORTAL
+# =============================================================================
+
+{$USER_DOMAIN_NAME:localhost} {
+    root * /usr/share/caddy
+    file_server
+}
