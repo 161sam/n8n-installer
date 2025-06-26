@@ -1,0 +1,9 @@
+Package: n8n-installer
+Version: 1.0
+Section: admin
+Priority: optional
+Architecture: all
+Maintainer: n8n community <info@n8n.io>
+Description: n8n-installer setup package with workspace utilities
+ This package installs the n8n-installer workspace and runs
+ installation scripts to set up all required dependencies.

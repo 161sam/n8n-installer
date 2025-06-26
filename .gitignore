@@ -9,3 +9,6 @@ shared-backup/
 shared/
 supabase/
 volumes/
+# Packaging
+packaging/deb/pkgroot/
+packaging/deb/*.deb

@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+cd /opt/n8n-installer/scripts
+bash install.sh
