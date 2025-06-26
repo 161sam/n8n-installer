@@ -8,7 +8,7 @@ This repository contains the **n8n-installer** – a Docker Compose based stack 
 - After installation users should change all default passwords.  Remind them if your changes touch login data.
 
 ## Typical Agent Tasks
-- Add or improve n8n workflows (`n8n-tool-workflows/` or `n8n/backup/`)
+- Add or improve n8n workflows (`modularium/ai-workspace/` or `n8n/backup/`)
 - Extend Python helpers such as `n8n_pipe.py` or `start_services.py`
 - Tweak Docker compose services or shell scripts in `scripts/`
 - Update documentation inside `ai-docs/` or other markdown files
