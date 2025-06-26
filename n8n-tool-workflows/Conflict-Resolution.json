@@ -1,0 +1,812 @@
+{
+  "name": "Knowledge Management Conflict Resolution",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyFiveMinutes"
+            }
+          ]
+        },
+        "triggerOn": "everyFiveMinutes",
+        "options": {}
+      },
+      "id": "conflict-detection-cron",
+      "name": "Conflict Detection Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "resolve-knowledge-conflicts",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "conflict-resolution-webhook",
+      "name": "Conflict Resolution Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 600],
+      "webhookId": "resolve-knowledge-conflicts"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resolution-mode",
+              "name": "resolutionMode",
+              "value": "={{ $json.body?.mode || 'auto' }}",
+              "type": "string"
+            },
+            {
+              "id": "conflict-threshold",
+              "name": "conflictThreshold",
+              "value": "={{ $json.body?.threshold || 5 }}",
+              "type": "number"
+            },
+            {
+              "id": "target-platforms",
+              "name": "targetPlatforms",
+              "value": "={{ $json.body?.platforms || ['appflowy', 'affine', 'google_drive'] }}",
+              "type": "array"
+            },
+            {
+              "id": "resolution-timestamp",
+              "name": "timestamp",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "enable-ai-resolution",
+              "name": "enableAIResolution",
+              "value": "={{ $json.body?.enableAIResolution || true }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-resolution-request",
+      "name": "Process Resolution Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Detect potential conflicts by finding documents with same content hash across different systems\nWITH potential_conflicts AS (\n  SELECT \n    content_hash,\n    array_agg(DISTINCT source_system) as systems,\n    array_agg(DISTINCT document_id) as document_ids,\n    array_agg(DISTINCT source_id) as source_ids,\n    COUNT(DISTINCT source_system) as system_count,\n    MAX(sync_timestamp) as latest_sync,\n    MIN(sync_timestamp) as earliest_sync\n  FROM knowledge_sync_log \n  WHERE status = 'synced' \n    AND sync_timestamp >= NOW() - INTERVAL '24 hours'\n  GROUP BY content_hash\n  HAVING COUNT(DISTINCT source_system) > 1\n),\ntimestamp_conflicts AS (\n  SELECT \n    l1.document_id as doc1_id,\n    l2.document_id as doc2_id,\n    l1.source_system as system1,\n    l2.source_system as system2,\n    l1.content_hash as hash1,\n    l2.content_hash as hash2,\n    l1.sync_timestamp as timestamp1,\n    l2.sync_timestamp as timestamp2,\n    ABS(EXTRACT(EPOCH FROM l1.sync_timestamp - l2.sync_timestamp)) as time_diff_seconds\n  FROM knowledge_sync_log l1\n  JOIN knowledge_sync_mapping m ON (l1.source_system = m.source_system AND l1.source_id = m.source_id)\n  JOIN knowledge_sync_log l2 ON (l2.source_system = m.target_system AND l2.source_id = m.target_id)\n  WHERE l1.content_hash != l2.content_hash\n    AND l1.sync_timestamp >= NOW() - INTERVAL '1 hour'\n    AND l2.sync_timestamp >= NOW() - INTERVAL '1 hour'\n    AND ABS(EXTRACT(EPOCH FROM l1.sync_timestamp - l2.sync_timestamp)) < 300\n)\nSELECT \n  'content_hash' as conflict_type,\n  content_hash as conflict_key,\n  systems,\n  document_ids,\n  system_count,\n  latest_sync,\n  'Multiple systems have same content hash' as description\nFROM potential_conflicts\nWHERE system_count > 1\nUNION ALL\nSELECT \n  'timestamp' as conflict_type,\n  CONCAT(doc1_id, '_', doc2_id) as conflict_key,\n  ARRAY[system1, system2] as systems,\n  ARRAY[doc1_id, doc2_id] as document_ids,\n  2 as system_count,\n  GREATEST(timestamp1, timestamp2) as latest_sync,\n  'Simultaneous updates detected' as description\nFROM timestamp_conflicts\nWHERE time_diff_seconds < 300\nORDER BY latest_sync DESC;",
+        "options": {}
+      },
+      "id": "detect-conflicts",
+      "name": "Detect Conflicts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [700, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "conflicts-found",
+              "name": "conflictsFound",
+              "value": "={{ $json.length > 0 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "conflict-count",
+              "name": "conflictCount",
+              "value": "={{ $json.length }}",
+              "type": "number"
+            },
+            {
+              "id": "conflicts-list",
+              "name": "conflictsList",
+              "value": "={{ $json }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "analyze-conflicts",
+      "name": "Analyze Conflicts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [950, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "conflicts-exist",
+              "leftValue": "={{ $json.conflictsFound }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-conflicts-exist",
+      "name": "Check Conflicts Exist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1200, 400]
+    },
+    {
+      "parameters": {
+        "fieldsToSplitOut": "conflictsList",
+        "options": {}
+      },
+      "id": "process-individual-conflicts",
+      "name": "Process Individual Conflicts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "conflict-analysis",
+              "name": "conflictAnalysis",
+              "value": "={{ {\n  type: $json.conflict_type,\n  key: $json.conflict_key,\n  systems: $json.systems,\n  documentIds: $json.document_ids,\n  systemCount: $json.system_count,\n  latestSync: $json.latest_sync,\n  description: $json.description,\n  severity: $json.system_count > 2 ? 'high' : 'medium',\n  resolutionStrategy: $json.conflict_type === 'timestamp' ? 'latest_wins' : 'merge_content'\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "classify-conflict",
+      "name": "Classify Conflict",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1700, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "timestamp-conflict",
+              "leftValue": "={{ $json.conflictAnalysis.type }}",
+              "rightValue": "timestamp",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-conflict-type",
+      "name": "Check Conflict Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1950, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Get detailed content for timestamp conflicts\nSELECT \n  l.document_id,\n  l.source_system,\n  l.source_id,\n  l.content_hash,\n  l.metadata,\n  l.sync_timestamp,\n  l.status\nFROM knowledge_sync_log l\nWHERE l.document_id = ANY({{ $('Classify Conflict').item.json.conflictAnalysis.documentIds }})\nORDER BY l.sync_timestamp DESC;",
+        "options": {}
+      },
+      "id": "get-conflict-details",
+      "name": "Get Conflict Details",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2200, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "latest-version",
+              "name": "latestVersion",
+              "value": "={{ $json[0] }}",
+              "type": "object"
+            },
+            {
+              "id": "conflicted-versions",
+              "name": "conflictedVersions",
+              "value": "={{ $json.slice(1) }}",
+              "type": "array"
+            },
+            {
+              "id": "resolution-decision",
+              "name": "resolutionDecision",
+              "value": "latest_wins",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "resolve-timestamp-conflict",
+      "name": "Resolve Timestamp Conflict",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2450, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Get all content versions for hash conflicts\nSELECT \n  l.document_id,\n  l.source_system,\n  l.source_id,\n  l.content_hash,\n  l.metadata,\n  l.sync_timestamp,\n  l.status\nFROM knowledge_sync_log l\nWHERE l.content_hash = '{{ $('Classify Conflict').item.json.conflictAnalysis.key }}'\nORDER BY l.sync_timestamp DESC;",
+        "options": {}
+      },
+      "id": "get-content-hash-details",
+      "name": "Get Content Hash Details",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2200, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "ai-resolution-enabled",
+              "leftValue": "={{ $('Process Resolution Request').item.json.enableAIResolution }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-ai-resolution-enabled",
+      "name": "Check AI Resolution Enabled",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2450, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.{{ $vars.domain_name }}/webhook/enhanced-rag-agent",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "chatInput": "Analyze these conflicting content versions and suggest the best resolution strategy. Consider content quality, recency, completeness, and potential merge opportunities. Content versions: {{ JSON.stringify($json) }}",
+          "sessionId": "conflict_resolution_{{ $('Process Resolution Request').item.json.timestamp }}",
+          "enableAnalysis": true
+        }
+      },
+      "id": "ai-conflict-analysis",
+      "name": "AI Conflict Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2700, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ai-resolution-strategy",
+              "name": "aiResolutionStrategy",
+              "value": "={{ $json.output || 'Use latest version based on timestamp' }}",
+              "type": "string"
+            },
+            {
+              "id": "recommended-action",
+              "name": "recommendedAction",
+              "value": "={{ $json.output?.includes('merge') ? 'merge_content' : 'use_latest' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-ai-resolution",
+      "name": "Process AI Resolution",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2950, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "manual-resolution-strategy",
+              "name": "manualResolutionStrategy",
+              "value": "use_latest_timestamp",
+              "type": "string"
+            },
+            {
+              "id": "resolution-reason",
+              "name": "resolutionReason",
+              "value": "Automatic resolution: using most recent version",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "apply-manual-resolution",
+      "name": "Apply Manual Resolution",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2700, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Mark conflicted versions as resolved and update status\nUPDATE knowledge_sync_log \nSET status = 'conflict_resolved',\n    metadata = metadata || jsonb_build_object(\n      'conflict_resolution', jsonb_build_object(\n        'resolved_at', NOW(),\n        'resolution_strategy', '{{ $json.recommendedAction || $json.manualResolutionStrategy }}',\n        'resolution_reason', '{{ $json.aiResolutionStrategy || $json.resolutionReason }}',\n        'conflict_type', '{{ $('Classify Conflict').item.json.conflictAnalysis.type }}'\n      )\n    )\nWHERE document_id = ANY({{ $('Classify Conflict').item.json.conflictAnalysis.documentIds }})\n  AND sync_timestamp < (SELECT MAX(sync_timestamp) FROM knowledge_sync_log WHERE document_id = ANY({{ $('Classify Conflict').item.json.conflictAnalysis.documentIds }}))\nRETURNING document_id, source_system, status;",
+        "options": {}
+      },
+      "id": "update-conflict-status",
+      "name": "Update Conflict Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3200, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": {
+          "__rl": true,
+          "value": "conflict_resolution_log",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "conflict_id",
+              "value": "={{ $('Classify Conflict').item.json.conflictAnalysis.key }}"
+            },
+            {
+              "column": "conflict_type",
+              "value": "={{ $('Classify Conflict').item.json.conflictAnalysis.type }}"
+            },
+            {
+              "column": "systems_involved",
+              "value": "={{ $('Classify Conflict').item.json.conflictAnalysis.systems }}"
+            },
+            {
+              "column": "documents_affected",
+              "value": "={{ $('Classify Conflict').item.json.conflictAnalysis.documentIds }}"
+            },
+            {
+              "column": "resolution_strategy",
+              "value": "={{ $json.recommendedAction || $json.manualResolutionStrategy }}"
+            },
+            {
+              "column": "resolution_details",
+              "value": "={{ { aiAnalysis: $json.aiResolutionStrategy, manualReason: $json.resolutionReason, severity: $('Classify Conflict').item.json.conflictAnalysis.severity } }}"
+            },
+            {
+              "column": "resolved_at",
+              "value": "={{ $now }}"
+            },
+            {
+              "column": "resolution_mode",
+              "value": "={{ $('Process Resolution Request').item.json.resolutionMode }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-conflict-resolution",
+      "name": "Log Conflict Resolution",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3450, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "conflictAnalysis"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aggregate-resolutions",
+      "name": "Aggregate Resolutions",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [3700, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resolution-summary",
+              "name": "resolutionSummary",
+              "value": "={{ {\n  timestamp: $('Process Resolution Request').item.json.timestamp,\n  mode: $('Process Resolution Request').item.json.resolutionMode,\n  conflictsDetected: $('Analyze Conflicts').item.json.conflictCount,\n  conflictsResolved: $json.conflictAnalysis?.length || 0,\n  aiResolutionEnabled: $('Process Resolution Request').item.json.enableAIResolution,\n  platforms: $('Process Resolution Request').item.json.targetPlatforms,\n  status: 'completed'\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "compile-resolution-report",
+      "name": "Compile Resolution Report",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [3950, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "no-conflicts-summary",
+              "name": "resolutionSummary",
+              "value": "={{ {\n  timestamp: $('Process Resolution Request').item.json.timestamp,\n  mode: $('Process Resolution Request').item.json.resolutionMode,\n  conflictsDetected: 0,\n  conflictsResolved: 0,\n  platforms: $('Process Resolution Request').item.json.targetPlatforms,\n  status: 'no_conflicts_found'\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-no-conflicts-response",
+      "name": "Prepare No Conflicts Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1200, 600]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-conflict-resolution",
+      "name": "Respond to Conflict Resolution",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [4200, 500]
+    },
+    {
+      "parameters": {
+        "content": "## Knowledge Management Conflict Resolution\n\n**Purpose:** Automatically detect and resolve conflicts between synchronized content across different knowledge management platforms.\n\n**Conflict Types Detected:**\n\n**1. Content Hash Conflicts:**\n- Multiple systems have identical content hashes\n- Indicates potential duplicate content\n- Resolution: Identify canonical source and update mappings\n\n**2. Timestamp Conflicts:**\n- Simultaneous updates within 5-minute window\n- Different content hashes for mapped documents\n- Resolution: Latest timestamp wins or AI-assisted merge\n\n**Resolution Strategies:**\n\n**Automatic Resolution:**\n- `latest_wins`: Use most recent timestamp\n- `merge_content`: AI-assisted content merging\n- `use_canonical`: Prefer designated canonical source\n\n**AI-Assisted Resolution:**\n- Content quality analysis\n- Automatic merge suggestions\n- Conflict complexity assessment\n- Resolution strategy recommendations\n\n**Detection Process:**\n1. **Scheduled Detection**: Every 5 minutes via cron\n2. **Manual Trigger**: Via webhook for immediate resolution\n3. **Cross-Reference**: Check sync mappings for related conflicts\n4. **Analysis**: Classify conflict type and severity\n\n**Resolution Process:**\n1. **Conflict Classification**: Determine type and severity\n2. **Content Analysis**: Gather all versions and metadata\n3. **AI Analysis** (if enabled): Get intelligent resolution recommendations\n4. **Apply Resolution**: Update content and sync status\n5. **Logging**: Record resolution details and strategy used\n6. **Notification**: Alert systems of resolution completion\n\n**API Parameters:**\n- `mode`: Resolution mode (auto, manual, ai_assisted)\n- `threshold`: Minimum conflicts to process\n- `platforms`: Target platforms to check\n- `enableAIResolution`: Use AI for complex conflicts\n\n**Monitoring:**\n- Conflict detection frequency and patterns\n- Resolution success rates by strategy\n- Platform-specific conflict trends\n- AI resolution effectiveness metrics",
+        "height": 800,
+        "width": 900,
+        "color": 7
+      },
+      "id": "conflict-resolution-documentation",
+      "name": "Conflict Resolution Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [100, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Conflict Detection Cron": {
+      "main": [
+        [
+          {
+            "node": "Process Resolution Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conflict Resolution Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Resolution Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Resolution Request": {
+      "main": [
+        [
+          {
+            "node": "Detect Conflicts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Conflicts": {
+      "main": [
+        [
+          {
+            "node": "Analyze Conflicts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Conflicts": {
+      "main": [
+        [
+          {
+            "node": "Check Conflicts Exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conflicts Exist": {
+      "main": [
+        [
+          {
+            "node": "Process Individual Conflicts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare No Conflicts Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Individual Conflicts": {
+      "main": [
+        [
+          {
+            "node": "Classify Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Conflict": {
+      "main": [
+        [
+          {
+            "node": "Check Conflict Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conflict Type": {
+      "main": [
+        [
+          {
+            "node": "Get Conflict Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Content Hash Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conflict Details": {
+      "main": [
+        [
+          {
+            "node": "Resolve Timestamp Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Timestamp Conflict": {
+      "main": [
+        [
+          {
+            "node": "Update Conflict Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Content Hash Details": {
+      "main": [
+        [
+          {
+            "node": "Check AI Resolution Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check AI Resolution Enabled": {
+      "main": [
+        [
+          {
+            "node": "AI Conflict Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply Manual Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Conflict Analysis": {
+      "main": [
+        [
+          {
+            "node": "Process AI Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process AI Resolution": {
+      "main": [
+        [
+          {
+            "node": "Update Conflict Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Manual Resolution": {
+      "main": [
+        [
+          {
+            "node": "Update Conflict Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Conflict Status": {
+      "main": [
+        [
+          {
+            "node": "Log Conflict Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Conflict Resolution": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Resolutions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Resolutions": {
+      "main": [
+        [
+          {
+            "node": "Compile Resolution Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Resolution Report": {
+      "main": [
+        [
+          {
+            "node": "Respond to Conflict Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare No Conflicts Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Conflict Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "conflict-resolution-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "ConflictResolution",
+  "tags": ["conflict-resolution", "knowledge-management", "automation", "ai-assisted"]
+}
