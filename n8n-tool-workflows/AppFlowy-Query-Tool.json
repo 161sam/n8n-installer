@@ -1,179 +1,69 @@
 {
-  "name": "Central Knowledge Management Orchestrator",
+  "name": "AppFlowy Direct Query Tool",
   "nodes": [
     {
       "parameters": {
-        "pollTimes": {
-          "item": [
-            {
-              "mode": "everyMinute"
-            }
-          ]
-        },
-        "triggerOn": "everyMinute",
-        "options": {}
-      },
-      "id": "orchestrator-cron-trigger",
-      "name": "Orchestrator Cron Trigger",
-      "type": "n8n-nodes-base.cron",
-      "typeVersion": 1,
-      "position": [200, 400]
-    },
-    {
-      "parameters": {
         "httpMethod": "POST",
-        "path": "knowledge-orchestrator",
+        "path": "appflowy-query-tool",
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "orchestrator-webhook",
-      "name": "Orchestrator Webhook",
+      "id": "appflowy-query-webhook",
+      "name": "AppFlowy Query Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 600],
-      "webhookId": "knowledge-orchestrator"
+      "position": [200, 400],
+      "webhookId": "appflowy-query-tool"
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "orchestration-mode",
-              "name": "mode",
-              "value": "={{ $json.body?.mode || 'auto' }}",
+              "id": "query-text",
+              "name": "queryText",
+              "value": "={{ $json.body.query || $json.body.searchTerm || '' }}",
               "type": "string"
             },
             {
-              "id": "target-systems",
-              "name": "targetSystems",
-              "value": "={{ $json.body?.targetSystems || ['appflowy', 'affine', 'google_drive'] }}",
+              "id": "query-type",
+              "name": "queryType",
+              "value": "={{ $json.body.queryType || 'semantic_search' }}",
+              "type": "string"
+            },
+            {
+              "id": "database-filter",
+              "name": "databaseFilter",
+              "value": "={{ $json.body.databaseFilter || [] }}",
               "type": "array"
             },
             {
-              "id": "orchestration-timestamp",
-              "name": "timestamp",
-              "value": "={{ $now }}",
+              "id": "workspace-filter",
+              "name": "workspaceFilter",
+              "value": "={{ $json.body.workspaceFilter || $vars.appflowy_default_workspace }}",
               "type": "string"
             },
             {
-              "id": "force-full-sync",
-              "name": "forceFullSync",
-              "value": "={{ $json.body?.forceFullSync || false }}",
-              "type": "boolean"
-            },
-            {
-              "id": "enable-ai-analysis",
-              "name": "enableAIAnalysis",
-              "value": "={{ $json.body?.enableAIAnalysis || true }}",
-              "type": "boolean"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "process-orchestration-request",
-      "name": "Process Orchestration Request",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [450, 500]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT \n  source_system,\n  COUNT(*) as total_documents,\n  MAX(sync_timestamp) as last_sync,\n  COUNT(CASE WHEN status = 'error' THEN 1 END) as error_count\nFROM knowledge_sync_log \nWHERE sync_timestamp > NOW() - INTERVAL '24 hours'\nGROUP BY source_system",
-        "options": {}
-      },
-      "id": "analyze-system-health",
-      "name": "Analyze System Health",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [700, 300],
-      "credentials": {
-        "postgres": {
-          "id": "postgres_credentials",
-          "name": "Postgres Account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT \n  document_id,\n  source_system,\n  content_hash,\n  sync_timestamp,\n  metadata\nFROM knowledge_sync_log \nWHERE status = 'synced' \n  AND sync_timestamp > NOW() - INTERVAL '1 hour'\nORDER BY sync_timestamp DESC",
-        "options": {}
-      },
-      "id": "get-recent-activity",
-      "name": "Get Recent Activity",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [700, 400],
-      "credentials": {
-        "postgres": {
-          "id": "postgres_credentials",
-          "name": "Postgres Account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT \n  sm.source_system,\n  sm.target_system,\n  sm.mapping_type,\n  COUNT(*) as mapping_count,\n  COUNT(CASE WHEN sm.status = 'active' THEN 1 END) as active_mappings,\n  COUNT(CASE WHEN sm.status = 'error' THEN 1 END) as error_mappings\nFROM knowledge_sync_mapping sm\nGROUP BY sm.source_system, sm.target_system, sm.mapping_type",
-        "options": {}
-      },
-      "id": "check-sync-mappings",
-      "name": "Check Sync Mappings",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [700, 500],
-      "credentials": {
-        "postgres": {
-          "id": "postgres_credentials",
-          "name": "Postgres Account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "system-health-summary",
-              "name": "systemHealth",
-              "value": "={{ $('Analyze System Health').all().reduce((acc, item) => { acc[item.source_system] = { totalDocs: item.total_documents, lastSync: item.last_sync, errorCount: item.error_count, status: item.error_count > 0 ? 'warning' : 'healthy' }; return acc; }, {}) }}",
-              "type": "object"
-            },
-            {
-              "id": "recent-activity-count",
-              "name": "recentActivityCount",
-              "value": "={{ $('Get Recent Activity').all().length }}",
+              "id": "result-limit",
+              "name": "resultLimit",
+              "value": "={{ $json.body.limit || 10 }}",
               "type": "number"
             },
             {
-              "id": "sync-mappings-summary",
-              "name": "syncMappings",
-              "value": "={{ $('Check Sync Mappings').all() }}",
-              "type": "array"
-            },
-            {
-              "id": "needs-maintenance",
-              "name": "needsMaintenance",
-              "value": "={{ Object.values($json.systemHealth).some(system => system.status === 'warning') }}",
-              "type": "boolean"
-            },
-            {
-              "id": "needs-sync",
-              "name": "needsSync",
-              "value": "={{ $json.recentActivityCount > 0 || $('Process Orchestration Request').item.json.forceFullSync }}",
+              "id": "include-metadata",
+              "name": "includeMetadata",
+              "value": "={{ $json.body.includeMetadata || true }}",
               "type": "boolean"
             }
           ]
         },
         "options": {}
       },
-      "id": "evaluate-orchestration-needs",
-      "name": "Evaluate Orchestration Needs",
+      "id": "process-appflowy-query",
+      "name": "Process AppFlowy Query",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [950, 400]
+      "position": [450, 400]
     },
     {
       "parameters": {
@@ -185,13 +75,12 @@
           },
           "conditions": [
             {
-              "id": "maintenance-needed",
-              "leftValue": "={{ $json.needsMaintenance }}",
-              "rightValue": true,
+              "id": "semantic-search-condition",
+              "leftValue": "={{ $json.queryType }}",
+              "rightValue": "semantic_search",
               "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
@@ -199,335 +88,261 @@
         },
         "options": {}
       },
-      "id": "check-maintenance-needed",
-      "name": "Check Maintenance Needed",
+      "id": "check-query-type",
+      "name": "Check Query Type",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest"
+      },
+      "id": "generate-query-embedding",
+      "name": "Generate Query Embedding",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [950, 300],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama_credentials",
+          "name": "Ollama API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "code": {
+          "execute": {
+            "code": "const { QdrantVectorStore } = require(\"@langchain/qdrant\");\nconst { OllamaEmbeddings } = require(\"@langchain/community/embeddings/ollama\");\n\nconst embeddings = new OllamaEmbeddings({\n  model: \"nomic-embed-text\",\n  baseUrl: \"http://ollama:11434\"\n});\n\nconst vectorStore = await QdrantVectorStore.fromExistingCollection(\n  embeddings,\n  {\n    url: \"http://qdrant:6333\",\n    collectionName: \"knowledge_base\",\n  }\n);\n\nconst queryText = this.getInputData()[0].json.queryText;\nconst resultLimit = this.getInputData()[0].json.resultLimit || 10;\n\n// Create filter for AppFlowy content only\nconst filter = {\n  must: [\n    {\n      key: \"metadata.source\",\n      match: {\n        value: \"appflowy\",\n      },\n    },\n  ],\n};\n\n// Perform semantic search\nconst results = await vectorStore.similaritySearch(queryText, resultLimit, filter);\n\n// Format results\nconst formattedResults = results.map((doc, index) => ({\n  id: index,\n  content: doc.pageContent,\n  metadata: doc.metadata,\n  source: 'vector_search',\n  relevanceScore: doc.score || 0\n}));\n\nreturn [{ json: { results: formattedResults, queryType: 'semantic_search', totalResults: formattedResults.length } }];"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "main",
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "main"
+            }
+          ]
+        }
+      },
+      "id": "perform-semantic-search",
+      "name": "Perform Semantic Search",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
       "position": [1200, 300]
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "sync-needed",
-              "leftValue": "={{ $json.needsSync }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
+        "operation": "listDatabases",
+        "workspaceId": "={{ $('Process AppFlowy Query').item.json.workspaceFilter }}",
         "options": {}
       },
-      "id": "check-sync-needed",
-      "name": "Check Sync Needed",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [1200, 500]
-    },
-    {
-      "parameters": {
-        "url": "https://n8n.{{ $vars.domain_name }}/webhook/trigger-knowledge-sync",
-        "options": {
-          "timeout": 120000
-        },
-        "sendBody": true,
-        "contentType": "json",
-        "body": {
-          "source": "all",
-          "direction": "bidirectional",
-          "forceSync": "={{ $('Process Orchestration Request').item.json.forceFullSync }}",
-          "orchestrationSession": "={{ $('Process Orchestration Request').item.json.timestamp }}"
-        }
-      },
-      "id": "trigger-bidirectional-sync",
-      "name": "Trigger Bidirectional Sync",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1450, 400]
-    },
-    {
-      "parameters": {
-        "url": "https://n8n.{{ $vars.domain_name }}/webhook/enhanced-rag-agent",
-        "options": {
-          "timeout": 60000
-        },
-        "sendBody": true,
-        "contentType": "json",
-        "body": {
-          "chatInput": "Please analyze the recent knowledge management activity and provide insights about content patterns, frequently updated topics, and potential knowledge gaps.",
-          "sessionId": "orchestrator-analysis-{{ $('Process Orchestration Request').item.json.timestamp }}",
-          "enableAnalysis": "={{ $('Process Orchestration Request').item.json.enableAIAnalysis }}"
-        }
-      },
-      "id": "trigger-ai-analysis",
-      "name": "Trigger AI Analysis",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1450, 600]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE knowledge_sync_log \nSET status = 'resolved'\nWHERE status = 'error' \n  AND sync_timestamp < NOW() - INTERVAL '1 hour'",
-        "options": {}
-      },
-      "id": "cleanup-old-errors",
-      "name": "Cleanup Old Errors",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [1450, 200],
+      "id": "get-appflowy-databases",
+      "name": "Get AppFlowy Databases",
+      "type": "n8n-nodes-appflowy.database",
+      "typeVersion": 1,
+      "position": [950, 500],
       "credentials": {
-        "postgres": {
-          "id": "postgres_credentials",
-          "name": "Postgres Account"
+        "appFlowyApi": {
+          "id": "appflowy_credentials",
+          "name": "AppFlowy API"
         }
       }
     },
     {
       "parameters": {
-        "url": "http://qdrant:6333/collections/knowledge_base/cluster/status",
+        "fieldsToSplitOut": "databases",
+        "options": {}
+      },
+      "id": "split-databases",
+      "name": "Split Databases",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1200, 500]
+    },
+    {
+      "parameters": {
+        "operation": "listRows",
+        "databaseId": "={{ $json.id }}",
         "options": {
-          "timeout": 10000
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "api-key",
-              "value": "{{ $vars.qdrant_api_key }}"
-            }
-          ]
+          "limit": "={{ $('Process AppFlowy Query').item.json.resultLimit }}"
         }
       },
-      "id": "check-vector-db-health",
-      "name": "Check Vector DB Health",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1450, 100]
+      "id": "get-database-rows",
+      "name": "Get Database Rows",
+      "type": "n8n-nodes-appflowy.database",
+      "typeVersion": 1,
+      "position": [1450, 500],
+      "credentials": {
+        "appFlowyApi": {
+          "id": "appflowy_credentials",
+          "name": "AppFlowy API"
+        }
+      }
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "orchestration-summary",
-              "name": "orchestrationSummary",
-              "value": "={{ { timestamp: $('Process Orchestration Request').item.json.timestamp, systemHealth: $('Evaluate Orchestration Needs').item.json.systemHealth, maintenancePerformed: $('Evaluate Orchestration Needs').item.json.needsMaintenance, syncTriggered: $('Evaluate Orchestration Needs').item.json.needsSync, recentActivity: $('Evaluate Orchestration Needs').item.json.recentActivityCount, vectorDbStatus: $('Check Vector DB Health').item.json.status || 'unknown', aiAnalysisEnabled: $('Process Orchestration Request').item.json.enableAIAnalysis } }}",
+              "id": "filter-rows",
+              "name": "filteredRows",
+              "value": "={{ $json.rows.filter(row => {\n  const queryText = $('Process AppFlowy Query').item.json.queryText.toLowerCase();\n  const searchableText = (row.title || '').toLowerCase() + ' ' + (row.content || '').toLowerCase() + ' ' + Object.values(row.fields || {}).join(' ').toLowerCase();\n  return searchableText.includes(queryText);\n}) }}",
+              "type": "array"
+            },
+            {
+              "id": "database-context",
+              "name": "databaseContext",
+              "value": "={{ { id: $json.id, name: $json.name, type: 'appflowy_database' } }}",
               "type": "object"
             }
           ]
         },
         "options": {}
       },
-      "id": "compile-orchestration-report",
-      "name": "Compile Orchestration Report",
+      "id": "filter-and-format-rows",
+      "name": "Filter and Format Rows",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [1700, 400]
+      "position": [1700, 500]
     },
     {
       "parameters": {
-        "operation": "insert",
-        "table": {
-          "__rl": true,
-          "value": "orchestration_log",
-          "mode": "list"
-        },
-        "data": {
-          "insert": [
-            {
-              "column": "session_id",
-              "value": "={{ $('Process Orchestration Request').item.json.timestamp }}"
-            },
-            {
-              "column": "mode",
-              "value": "={{ $('Process Orchestration Request').item.json.mode }}"
-            },
-            {
-              "column": "target_systems",
-              "value": "={{ $('Process Orchestration Request').item.json.targetSystems }}"
-            },
-            {
-              "column": "maintenance_performed",
-              "value": "={{ $('Evaluate Orchestration Needs').item.json.needsMaintenance }}"
-            },
-            {
-              "column": "sync_triggered",
-              "value": "={{ $('Evaluate Orchestration Needs').item.json.needsSync }}"
-            },
-            {
-              "column": "system_health",
-              "value": "={{ $('Evaluate Orchestration Needs').item.json.systemHealth }}"
-            },
-            {
-              "column": "orchestration_summary",
-              "value": "={{ $json.orchestrationSummary }}"
-            },
-            {
-              "column": "created_at",
-              "value": "={{ $now }}"
-            }
-          ]
-        },
+        "fieldsToSplitOut": "filteredRows",
         "options": {}
       },
-      "id": "log-orchestration-session",
-      "name": "Log Orchestration Session",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [1950, 400],
-      "credentials": {
-        "postgres": {
-          "id": "postgres_credentials",
-          "name": "Postgres Account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "webhook-trigger-check",
-              "leftValue": "={{ $('Orchestrator Webhook').item }}",
-              "rightValue": "",
-              "operator": {
-                "type": "object",
-                "operation": "notEmpty"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "check-webhook-response-needed",
-      "name": "Check Webhook Response Needed",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [2200, 400]
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "id": "respond-to-orchestrator-webhook",
-      "name": "Respond to Orchestrator Webhook",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [2450, 300]
-    },
-    {
-      "parameters": {
-        "pollTimes": {
-          "item": [
-            {
-              "mode": "everyHour"
-            }
-          ]
-        },
-        "triggerOn": "everyHour",
-        "options": {}
-      },
-      "id": "deep-analysis-trigger",
-      "name": "Deep Analysis Trigger",
-      "type": "n8n-nodes-base.cron",
-      "typeVersion": 1,
-      "position": [200, 800]
+      "id": "split-filtered-rows",
+      "name": "Split Filtered Rows",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1950, 500]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "deep-analysis-mode",
-              "name": "mode",
-              "value": "deep_analysis",
-              "type": "string"
-            },
-            {
-              "id": "analysis-timestamp",
-              "name": "timestamp",
-              "value": "={{ $now }}",
-              "type": "string"
-            },
-            {
-              "id": "enable-full-ai",
-              "name": "enableAIAnalysis",
-              "value": true,
-              "type": "boolean"
+              "id": "format-direct-result",
+              "name": "formattedResult",
+              "value": "={{ {\n  id: $json.id,\n  content: ($json.title || '') + '\\n\\n' + ($json.content || '') + '\\n\\nFields: ' + JSON.stringify($json.fields || {}),\n  metadata: {\n    source: 'appflowy',\n    type: 'database_row',\n    database_id: $('Filter and Format Rows').item.json.databaseContext.id,\n    database_name: $('Filter and Format Rows').item.json.databaseContext.name,\n    row_id: $json.id,\n    title: $json.title,\n    created_at: $json.created_at,\n    updated_at: $json.updated_at\n  },\n  source: 'direct_query',\n  relevanceScore: 1.0\n} }}",
+              "type": "object"
             }
           ]
         },
         "options": {}
       },
-      "id": "prepare-deep-analysis",
-      "name": "Prepare Deep Analysis",
+      "id": "format-direct-query-result",
+      "name": "Format Direct Query Result",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [450, 800]
+      "position": [2200, 500]
     },
     {
       "parameters": {
-        "url": "https://n8n.{{ $vars.domain_name }}/webhook/enhanced-rag-agent",
-        "options": {
-          "timeout": 180000
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "formattedResult"
+            }
+          ]
         },
-        "sendBody": true,
-        "contentType": "json",
-        "body": {
-          "chatInput": "Perform a comprehensive analysis of the knowledge management system: 1) Identify content clusters and themes across all platforms, 2) Detect knowledge gaps and outdated information, 3) Suggest content consolidation opportunities, 4) Analyze user interaction patterns, 5) Recommend system optimizations.",
-          "sessionId": "deep-analysis-{{ $json.timestamp }}",
-          "enableAnalysis": true
-        }
+        "options": {}
       },
-      "id": "perform-deep-analysis",
-      "name": "Perform Deep Analysis",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [700, 800]
+      "id": "aggregate-direct-results",
+      "name": "Aggregate Direct Results",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [2450, 500]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "combine-all-results",
+              "name": "allResults",
+              "value": "={{ [...($('Perform Semantic Search').all().flatMap(item => item.results || [])), ...($('Aggregate Direct Results').all().flatMap(item => item.formattedResult || []))] }}",
+              "type": "array"
+            },
+            {
+              "id": "query-summary",
+              "name": "querySummary",
+              "value": "={{ {\n  queryText: $('Process AppFlowy Query').item.json.queryText,\n  queryType: $('Process AppFlowy Query').item.json.queryType,\n  totalResults: $json.allResults.length,\n  semanticResults: ($('Perform Semantic Search').all().flatMap(item => item.results || [])).length,\n  directResults: ($('Aggregate Direct Results').all().flatMap(item => item.formattedResult || [])).length,\n  timestamp: $now\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "combine-all-results",
+      "name": "Combine All Results",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2700, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ranked-results",
+              "name": "rankedResults",
+              "value": "={{ $json.allResults.sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, $('Process AppFlowy Query').item.json.resultLimit) }}",
+              "type": "array"
+            },
+            {
+              "id": "response-metadata",
+              "name": "responseMetadata",
+              "value": "={{ {\n  queryProcessed: $json.querySummary.queryText,\n  resultsFound: $json.rankedResults.length,\n  queryType: $json.querySummary.queryType,\n  includeMetadata: $('Process AppFlowy Query').item.json.includeMetadata,\n  timestamp: $now\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "rank-and-limit-results",
+      "name": "Rank and Limit Results",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2950, 400]
     },
     {
       "parameters": {
         "operation": "insert",
         "table": {
           "__rl": true,
-          "value": "deep_analysis_reports",
+          "value": "query_analytics",
           "mode": "list"
         },
         "data": {
           "insert": [
             {
-              "column": "analysis_timestamp",
-              "value": "={{ $('Prepare Deep Analysis').item.json.timestamp }}"
+              "column": "query_text",
+              "value": "={{ $('Process AppFlowy Query').item.json.queryText }}"
             },
             {
-              "column": "analysis_type",
-              "value": "comprehensive_knowledge_audit"
+              "column": "query_type",
+              "value": "appflowy_direct"
             },
             {
-              "column": "findings",
-              "value": "={{ $json.output || $json.response || 'Analysis completed' }}"
+              "column": "results_count",
+              "value": "={{ $json.rankedResults.length }}"
             },
             {
-              "column": "recommendations",
-              "value": "{{ [] }}"
+              "column": "response_time_ms",
+              "value": "={{ $now - $('Process AppFlowy Query').item.json.timestamp }}"
+            },
+            {
+              "column": "query_metadata",
+              "value": "={{ $json.responseMetadata }}"
             },
             {
               "column": "created_at",
@@ -537,11 +352,11 @@
         },
         "options": {}
       },
-      "id": "store-deep-analysis-report",
-      "name": "Store Deep Analysis Report",
+      "id": "log-query-analytics",
+      "name": "Log Query Analytics",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [950, 800],
+      "position": [3200, 600],
       "credentials": {
         "postgres": {
           "id": "postgres_credentials",
@@ -551,204 +366,179 @@
     },
     {
       "parameters": {
-        "content": "## Central Knowledge Management Orchestrator\n\n**Purpose:** Master controller for the entire knowledge management ecosystem, coordinating all sync processes, health monitoring, and AI-driven insights.\n\n**Core Functions:**\n- **Health Monitoring**: Continuous system health checks across all platforms\n- **Sync Orchestration**: Coordinates bidirectional sync processes\n- **AI Analysis**: Triggers intelligent content analysis and recommendations  \n- **Maintenance**: Automated cleanup and optimization tasks\n- **Reporting**: Comprehensive logging and analytics\n- **Deep Analysis**: Periodic comprehensive knowledge audits\n\n**Triggers:**\n- Cron: Every minute for routine checks\n- Webhook: On-demand orchestration\n- Hourly: Deep analysis and comprehensive audits\n\n**Integrations:**\n- AppFlowy Content Sync\n- Affine Content Sync  \n- Bidirectional Knowledge Sync\n- Enhanced RAG AI Agent\n- Vector Database Health Checks\n- PostgreSQL Analytics\n\n**API Endpoints:**\n- POST /webhook/knowledge-orchestrator\n- Supports: mode, targetSystems, forceFullSync, enableAIAnalysis parameters",
-        "height": 700,
-        "width": 900,
-        "color": 1
+        "options": {}
       },
-      "id": "orchestrator-documentation",
-      "name": "Orchestrator Documentation",
+      "id": "respond-to-appflowy-query",
+      "name": "Respond to AppFlowy Query",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3200, 400]
+    },
+    {
+      "parameters": {
+        "content": "## AppFlowy Direct Query Tool\n\n**Purpose:** Direct querying interface for AppFlowy databases and content with both semantic and direct search capabilities.\n\n**Features:**\n- **Semantic Search**: Vector-based similarity search using embeddings\n- **Direct Query**: Text-based filtering across AppFlowy databases\n- **Result Ranking**: Relevance scoring and result prioritization\n- **Analytics**: Query performance tracking and usage analytics\n- **Flexible Filtering**: Database, workspace, and content type filters\n\n**Query Types:**\n- `semantic_search`: Vector similarity search (default)\n- `direct_query`: Text-based database search\n- `hybrid`: Combination of both approaches\n\n**API Parameters:**\n- `query`: Search text/question\n- `queryType`: Type of search to perform\n- `databaseFilter`: Specific databases to search\n- `workspaceFilter`: Target workspace ID\n- `limit`: Maximum results to return\n- `includeMetadata`: Include detailed metadata\n\n**Response Format:**\n```json\n{\n  \"rankedResults\": [...],\n  \"responseMetadata\": {...}\n}\n```",
+        "height": 600,
+        "width": 700,
+        "color": 4
+      },
+      "id": "appflowy-query-documentation",
+      "name": "AppFlowy Query Documentation",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [2600, 50]
+      "position": [100, 100]
     }
   ],
   "pinData": {},
   "connections": {
-    "Orchestrator Cron Trigger": {
+    "AppFlowy Query Webhook": {
       "main": [
         [
           {
-            "node": "Process Orchestration Request",
+            "node": "Process AppFlowy Query",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Orchestrator Webhook": {
+    "Process AppFlowy Query": {
       "main": [
         [
           {
-            "node": "Process Orchestration Request",
+            "node": "Check Query Type",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Process Orchestration Request": {
+    "Check Query Type": {
       "main": [
         [
           {
-            "node": "Analyze System Health",
+            "node": "Perform Semantic Search",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get AppFlowy Databases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perform Semantic Search": {
+      "main": [
+        [
+          {
+            "node": "Combine All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get AppFlowy Databases": {
+      "main": [
+        [
+          {
+            "node": "Split Databases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Databases": {
+      "main": [
+        [
+          {
+            "node": "Get Database Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Database Rows": {
+      "main": [
+        [
+          {
+            "node": "Filter and Format Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter and Format Rows": {
+      "main": [
+        [
+          {
+            "node": "Split Filtered Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Filtered Rows": {
+      "main": [
+        [
+          {
+            "node": "Format Direct Query Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Direct Query Result": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Direct Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Direct Results": {
+      "main": [
+        [
+          {
+            "node": "Combine All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine All Results": {
+      "main": [
+        [
+          {
+            "node": "Rank and Limit Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rank and Limit Results": {
+      "main": [
+        [
+          {
+            "node": "Respond to AppFlowy Query",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Get Recent Activity",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Check Sync Mappings",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Recent Activity": {
-      "main": [
-        [
-          {
-            "node": "Evaluate Orchestration Needs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Evaluate Orchestration Needs": {
-      "main": [
-        [
-          {
-            "node": "Check Maintenance Needed",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Check Sync Needed",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Maintenance Needed": {
-      "main": [
-        [
-          {
-            "node": "Cleanup Old Errors",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Check Vector DB Health",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Sync Needed": {
-      "main": [
-        [
-          {
-            "node": "Trigger Bidirectional Sync",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Trigger AI Analysis",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Trigger Bidirectional Sync": {
-      "main": [
-        [
-          {
-            "node": "Compile Orchestration Report",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Vector DB Health": {
-      "main": [
-        [
-          {
-            "node": "Compile Orchestration Report",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Compile Orchestration Report": {
-      "main": [
-        [
-          {
-            "node": "Log Orchestration Session",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Log Orchestration Session": {
-      "main": [
-        [
-          {
-            "node": "Check Webhook Response Needed",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Webhook Response Needed": {
-      "main": [
-        [
-          {
-            "node": "Respond to Orchestrator Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Deep Analysis Trigger": {
-      "main": [
-        [
-          {
-            "node": "Prepare Deep Analysis",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare Deep Analysis": {
-      "main": [
-        [
-          {
-            "node": "Perform Deep Analysis",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Perform Deep Analysis": {
-      "main": [
-        [
-          {
-            "node": "Store Deep Analysis Report",
+            "node": "Log Query Analytics",
             "type": "main",
             "index": 0
           }
@@ -760,10 +550,10 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "orchestrator-v1",
+  "versionId": "appflowy-query-v1",
   "meta": {
     "templateCredsSetupCompleted": true
   },
-  "id": "KnowledgeOrchestrator",
-  "tags": ["orchestrator", "knowledge-management", "automation", "monitoring", "ai-analysis"]
+  "id": "AppFlowyQueryTool",
+  "tags": ["appflowy", "query", "search", "tool", "semantic"]
 }
