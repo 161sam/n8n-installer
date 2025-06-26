@@ -89,41 +89,41 @@
             <div class="category">
                 <h2>🤖 AI Services</h2>
                 <ul class="services">
-                    <li><a href="https://n8n.ecospherenet.work" target="_blank">🔄 N8N - Workflow Automation</a></li>
-                    <li><a href="https://flowise.ecospherenet.work" target="_blank">🧠 Flowise - AI Agent Builder</a></li>
-                    <li><a href="https://webui.ecospherenet.work" target="_blank">💬 Open WebUI - AI Chat</a></li>
-                    <li><a href="https://langfuse.ecospherenet.work" target="_blank">📊 Langfuse - AI Observability</a></li>
+                    <li><a data-subdomain="n8n" target="_blank">🔄 N8N - Workflow Automation</a></li>
+                    <li><a data-subdomain="flowise" target="_blank">🧠 Flowise - AI Agent Builder</a></li>
+                    <li><a data-subdomain="webui" target="_blank">💬 Open WebUI - AI Chat</a></li>
+                    <li><a data-subdomain="langfuse" target="_blank">📊 Langfuse - AI Observability</a></li>
                 </ul>
             </div>
             
             <div class="category">
                 <h2>📚 Productivity</h2>
                 <ul class="services">
-                    <li><a href="https://affine.ecospherenet.work" target="_blank">📝 Affine - Knowledge Management</a></li>
-                    <li><a href="https://appflowy.ecospherenet.work" target="_blank">📋 AppFlowy - Collaborative Workspace</a></li>
+                    <li><a data-subdomain="affine" target="_blank">📝 Affine - Knowledge Management</a></li>
+                    <li><a data-subdomain="appflowy" target="_blank">📋 AppFlowy - Collaborative Workspace</a></li>
 			<!-- wird zukünftig implementiert -->
-<!--                    <li><a href="https://gitlab.ecospherenet.work" target="_blank">🦊 GitLab - Repository</a></li>    		   -->
-<!--                    <li><a href="https://openproject.ecospherenet.work" target="_blank">📊 OpenProject - Management</a></li> 	   -->
+<!--                    <li><a href="https://gitlab.yourdomain.com" target="_blank">🦊 GitLab - Repository</a></li>    		   -->
+<!--                    <li><a href="https://openproject.yourdomain.com" target="_blank">📊 OpenProject - Management</a></li> 	   -->
                 </ul>
             </div>
             
             <div class="category">
                 <h2>🔧 Management</h2>
                 <ul class="services">
-                    <li><a href="https://grafana.ecospherenet.work" target="_blank">📊 Grafana - Monitoring</a></li>
-                    <li><a href="https://portainer.ecospherenet.work" target="_blank">🐳 Portainer - Containers</a></li>
-                    <li><a href="https://supabase.ecospherenet.work" target="_blank">🗄️ Supabase - Database</a></li>
-                    <li><a href="https://prometheus.ecospherenet.work" target="_blank">🔍 Prometheus - Metrics</a></li>
+                    <li><a data-subdomain="grafana" target="_blank">📊 Grafana - Monitoring</a></li>
+                    <li><a data-subdomain="portainer" target="_blank">🐳 Portainer - Containers</a></li>
+                    <li><a data-subdomain="supabase" target="_blank">🗄️ Supabase - Database</a></li>
+                    <li><a data-subdomain="prometheus" target="_blank">🔍 Prometheus - Metrics</a></li>
                 </ul>
             </div>
             
             <div class="category">
                 <h2>🔍 Tools</h2>
                 <ul class="services">
-                    <li><a href="https://searxng.ecospherenet.work" target="_blank">🔎 SearXNG - Private Search</a></li>
-                    <li><a href="https://crawl4ai.ecospherenet.work" target="_blank">🕸️ Crawl4AI - Web Scraping</a></li>
-                    <li><a href="https://qdrant.ecospherenet.work" target="_blank">🗃️ Qdrant - Vector DB</a></li>
-                    <li><a href="https://ollama.ecospherenet.work" target="_blank">🤖 Ollama - Local LLM</a></li>
+                    <li><a data-subdomain="searxng" target="_blank">🔎 SearXNG - Private Search</a></li>
+                    <li><a data-subdomain="crawl4ai" target="_blank">🕸️ Crawl4AI - Web Scraping</a></li>
+                    <li><a data-subdomain="qdrant" target="_blank">🗃️ Qdrant - Vector DB</a></li>
+                    <li><a data-subdomain="ollama" target="_blank">🤖 Ollama - Local LLM</a></li>
                 </ul>
             </div>
         </div>
@@ -136,3 +136,16 @@
 </div>
 
 
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const parts = window.location.hostname.split('.');
+    const baseDomain = parts.length > 1 ? parts.slice(1).join('.') : parts[0];
+    document.querySelectorAll('a[data-subdomain]').forEach(a => {
+      const sub = a.getAttribute('data-subdomain');
+      a.href = `https://${sub}.${baseDomain}`;
+    });
+  });
+</script>
+
+</body>
+</html>
