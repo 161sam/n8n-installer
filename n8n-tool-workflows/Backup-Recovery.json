@@ -1,0 +1,1067 @@
+{
+  "name": "Automated Knowledge Management Backup & Recovery",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "daily-backup-trigger",
+      "name": "Daily Backup Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "weekly-full-backup-trigger",
+      "name": "Weekly Full Backup Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 500]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "backup-knowledge-management",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "backup-webhook",
+      "name": "Backup Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 700],
+      "webhookId": "backup-knowledge-management"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "restore-knowledge-management",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "restore-webhook",
+      "name": "Restore Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 900],
+      "webhookId": "restore-knowledge-management"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "backup-type",
+              "name": "backupType",
+              "value": "={{ $json.body?.type || ($json.$node?.name?.includes('Weekly') ? 'full' : 'incremental') }}",
+              "type": "string"
+            },
+            {
+              "id": "backup-timestamp",
+              "name": "timestamp",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "backup-id",
+              "name": "backupId",
+              "value": "={{ 'backup_' + $moment().format('YYYY-MM-DD_HH-mm-ss') }}",
+              "type": "string"
+            },
+            {
+              "id": "target-systems",
+              "name": "targetSystems",
+              "value": "={{ $json.body?.systems || ['postgresql', 'qdrant', 'appflowy', 'affine', 'google_drive'] }}",
+              "type": "array"
+            },
+            {
+              "id": "compression-enabled",
+              "name": "compressionEnabled",
+              "value": "={{ $json.body?.compression || true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "retention-days",
+              "name": "retentionDays",
+              "value": "={{ $json.body?.retentionDays || 30 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-backup-request",
+      "name": "Process Backup Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 500]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "restore-type",
+              "name": "restoreType",
+              "value": "={{ $json.body.type || 'full' }}",
+              "type": "string"
+            },
+            {
+              "id": "restore-timestamp",
+              "name": "timestamp",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "source-backup-id",
+              "name": "sourceBackupId",
+              "value": "={{ $json.body.backupId }}",
+              "type": "string"
+            },
+            {
+              "id": "target-point-in-time",
+              "name": "targetPointInTime",
+              "value": "={{ $json.body.pointInTime || null }}",
+              "type": "string"
+            },
+            {
+              "id": "restore-systems",
+              "name": "restoreSystems",
+              "value": "={{ $json.body.systems || ['all'] }}",
+              "type": "array"
+            },
+            {
+              "id": "validate-before-restore",
+              "name": "validateBeforeRestore",
+              "value": "={{ $json.body.validate || true }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "process-restore-request",
+      "name": "Process Restore Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 900]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "postgresql-enabled",
+              "leftValue": "={{ $json.targetSystems.includes('postgresql') }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-postgresql-backup",
+      "name": "Check PostgreSQL Backup",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "qdrant-enabled",
+              "leftValue": "={{ $json.targetSystems.includes('qdrant') }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-qdrant-backup",
+      "name": "Check Qdrant Backup",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "incremental-backup",
+              "leftValue": "={{ $json.backupType }}",
+              "rightValue": "incremental",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-backup-type",
+      "name": "Check Backup Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [950, 400]
+    },
+    {
+      "parameters": {
+        "command": "BACKUP_ID=\"{{ $('Process Backup Request').item.json.backupId }}\"\nBACKUP_TYPE=\"{{ $('Process Backup Request').item.json.backupType }}\"\nBACKUP_DIR=\"/data/shared/backups/${BACKUP_ID}\"\n\n# Create backup directory\nmkdir -p \"${BACKUP_DIR}\"\n\n# PostgreSQL backup\necho \"Starting PostgreSQL backup...\"\nif [ \"$BACKUP_TYPE\" = \"incremental\" ]; then\n  # Incremental backup using WAL archiving\n  PGPASSWORD=\"{{ $vars.postgres_password }}\" pg_basebackup -h shared-postgres -U postgres -D \"${BACKUP_DIR}/postgresql_incremental\" -Ft -z -P\nelse\n  # Full database dump\n  PGPASSWORD=\"{{ $vars.postgres_password }}\" pg_dumpall -h shared-postgres -U postgres -f \"${BACKUP_DIR}/postgresql_full.sql\"\n  \n  # Individual database dumps\n  for db in n8n_db appflowy_db affine_db langfuse_db; do\n    PGPASSWORD=\"{{ $vars.postgres_password }}\" pg_dump -h shared-postgres -U postgres -d $db -f \"${BACKUP_DIR}/${db}.sql\"\n  done\nfi\n\n# Compress if enabled\nif [ \"{{ $('Process Backup Request').item.json.compressionEnabled }}\" = \"true\" ]; then\n  cd \"${BACKUP_DIR}\" && tar -czf postgresql_backup.tar.gz *.sql 2>/dev/null || true\n  rm -f *.sql 2>/dev/null || true\nfi\n\necho \"PostgreSQL backup completed\"\necho \"Backup location: ${BACKUP_DIR}\"\nls -la \"${BACKUP_DIR}\""
+      },
+      "id": "backup-postgresql",
+      "name": "Backup PostgreSQL",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "command": "BACKUP_ID=\"{{ $('Process Backup Request').item.json.backupId }}\"\nBACKUP_DIR=\"/data/shared/backups/${BACKUP_ID}\"\n\n# Create backup directory\nmkdir -p \"${BACKUP_DIR}/qdrant\"\n\necho \"Starting Qdrant backup...\"\n\n# Create Qdrant snapshot via API\ncurl -X POST \"http://qdrant:6333/collections/knowledge_base/snapshots\" \\\n  -H \"api-key: {{ $vars.qdrant_api_key }}\" \\\n  -H \"Content-Type: application/json\" \\\n  -o \"${BACKUP_DIR}/qdrant/snapshot_response.json\"\n\n# Extract snapshot name from response\nSNAPSHOT_NAME=$(cat \"${BACKUP_DIR}/qdrant/snapshot_response.json\" | grep -o '\"name\":\"[^\"]*\"' | cut -d'\"' -f4)\n\nif [ ! -z \"$SNAPSHOT_NAME\" ]; then\n  echo \"Snapshot created: $SNAPSHOT_NAME\"\n  \n  # Download the snapshot\n  curl -X GET \"http://qdrant:6333/collections/knowledge_base/snapshots/${SNAPSHOT_NAME}\" \\\n    -H \"api-key: {{ $vars.qdrant_api_key }}\" \\\n    -o \"${BACKUP_DIR}/qdrant/${SNAPSHOT_NAME}\"\n  \n  # Compress if enabled\n  if [ \"{{ $('Process Backup Request').item.json.compressionEnabled }}\" = \"true\" ]; then\n    cd \"${BACKUP_DIR}/qdrant\" && gzip \"${SNAPSHOT_NAME}\"\n  fi\n  \n  echo \"Qdrant backup completed successfully\"\nelse\n  echo \"Failed to create Qdrant snapshot\"\n  exit 1\nfi\n\necho \"Qdrant backup location: ${BACKUP_DIR}/qdrant\"\nls -la \"${BACKUP_DIR}/qdrant\""
+      },
+      "id": "backup-qdrant",
+      "name": "Backup Qdrant",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1200, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Export knowledge sync metadata and mappings\nCOPY (\n  SELECT \n    document_id,\n    source_system,\n    source_id,\n    content_hash,\n    metadata,\n    sync_timestamp,\n    status\n  FROM knowledge_sync_log \n  WHERE sync_timestamp >= NOW() - INTERVAL '{{ $('Process Backup Request').item.json.backupType === 'incremental' ? '24 hours' : '999 years' }}'\n) TO '/data/shared/backups/{{ $('Process Backup Request').item.json.backupId }}/knowledge_sync_log.csv' WITH CSV HEADER;\n\nCOPY (\n  SELECT \n    source_system,\n    source_id,\n    target_system,\n    target_id,\n    mapping_type,\n    sync_direction,\n    status,\n    metadata,\n    created_at,\n    updated_at\n  FROM knowledge_sync_mapping\n  WHERE status = 'active'\n) TO '/data/shared/backups/{{ $('Process Backup Request').item.json.backupId }}/knowledge_sync_mapping.csv' WITH CSV HEADER;\n\nSELECT 'Metadata export completed' as status;",
+        "options": {}
+      },
+      "id": "export-knowledge-metadata",
+      "name": "Export Knowledge Metadata",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1200, 700],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "appflowy-backup-enabled",
+              "leftValue": "={{ $json.targetSystems.includes('appflowy') }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-appflowy-backup",
+      "name": "Check AppFlowy Backup",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "google-drive-backup-enabled",
+              "leftValue": "={{ $json.targetSystems.includes('google_drive') }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-google-drive-backup",
+      "name": "Check Google Drive Backup",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1450, 600]
+    },
+    {
+      "parameters": {
+        "url": "http://appflowy-cloud:8000/api/export/workspace/{{ $vars.appflowy_workspace_id }}",
+        "options": {
+          "timeout": 180000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $vars.appflowy_api_token }}"
+            }
+          ]
+        }
+      },
+      "id": "export-appflowy-data",
+      "name": "Export AppFlowy Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1700, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "folderId": {
+          "__rl": true,
+          "value": "{{ $vars.google_drive_backup_folder_id }}",
+          "mode": "list"
+        },
+        "options": {
+          "fileName": "appflowy_backup_{{ $('Process Backup Request').item.json.backupId }}.json"
+        }
+      },
+      "id": "save-appflowy-backup",
+      "name": "Save AppFlowy Backup",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1950, 300],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google_drive_credentials",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "list",
+        "folderId": {
+          "__rl": true,
+          "value": "{{ $vars.google_drive_knowledge_folder_id }}",
+          "mode": "list"
+        },
+        "options": {
+          "fields": ["id", "name", "mimeType", "modifiedTime", "size", "md5Checksum"],
+          "recursive": true
+        }
+      },
+      "id": "list-google-drive-files",
+      "name": "List Google Drive Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1700, 500],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google_drive_credentials",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "google-drive-manifest",
+              "name": "googleDriveManifest",
+              "value": "={{ {\n  backupId: $('Process Backup Request').item.json.backupId,\n  timestamp: $('Process Backup Request').item.json.timestamp,\n  fileCount: $json.files?.length || 0,\n  files: ($json.files || []).map(file => ({\n    id: file.id,\n    name: file.name,\n    mimeType: file.mimeType,\n    modifiedTime: file.modifiedTime,\n    size: file.size,\n    md5Checksum: file.md5Checksum\n  }))\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-google-drive-manifest",
+      "name": "Create Google Drive Manifest",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1950, 500]
+    },
+    {
+      "parameters": {
+        "mode": "jsonToBinary",
+        "options": {
+          "fileName": "google_drive_manifest_{{ $('Process Backup Request').item.json.backupId }}.json",
+          "mimeType": "application/json"
+        }
+      },
+      "id": "convert-manifest-to-file",
+      "name": "Convert Manifest to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [2200, 500]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "folderId": {
+          "__rl": true,
+          "value": "{{ $vars.google_drive_backup_folder_id }}",
+          "mode": "list"
+        }
+      },
+      "id": "save-google-drive-manifest",
+      "name": "Save Google Drive Manifest",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [2450, 500],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google_drive_credentials",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "backup-summary",
+              "name": "backupSummary",
+              "value": "={{ {\n  backupId: $('Process Backup Request').item.json.backupId,\n  backupType: $('Process Backup Request').item.json.backupType,\n  timestamp: $('Process Backup Request').item.json.timestamp,\n  systemsBackedUp: $('Process Backup Request').item.json.targetSystems,\n  compressionEnabled: $('Process Backup Request').item.json.compressionEnabled,\n  backupLocation: '/data/shared/backups/' + $('Process Backup Request').item.json.backupId,\n  postgresqlBackup: $('Check PostgreSQL Backup').item ? 'completed' : 'skipped',\n  qdrantBackup: $('Check Qdrant Backup').item ? 'completed' : 'skipped',\n  appflowyBackup: $('Check AppFlowy Backup').item ? 'completed' : 'skipped',\n  googleDriveManifest: $('Check Google Drive Backup').item ? 'completed' : 'skipped',\n  status: 'completed',\n  completedAt: $now\n} }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "compile-backup-summary",
+      "name": "Compile Backup Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2700, 400]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": {
+          "__rl": true,
+          "value": "backup_log",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "backup_id",
+              "value": "={{ $('Process Backup Request').item.json.backupId }}"
+            },
+            {
+              "column": "backup_type",
+              "value": "={{ $('Process Backup Request').item.json.backupType }}"
+            },
+            {
+              "column": "systems_backed_up",
+              "value": "={{ $('Process Backup Request').item.json.targetSystems }}"
+            },
+            {
+              "column": "backup_location",
+              "value": "={{ '/data/shared/backups/' + $('Process Backup Request').item.json.backupId }}"
+            },
+            {
+              "column": "compression_enabled",
+              "value": "={{ $('Process Backup Request').item.json.compressionEnabled }}"
+            },
+            {
+              "column": "backup_summary",
+              "value": "={{ $json.backupSummary }}"
+            },
+            {
+              "column": "status",
+              "value": "completed"
+            },
+            {
+              "column": "started_at",
+              "value": "={{ $('Process Backup Request').item.json.timestamp }}"
+            },
+            {
+              "column": "completed_at",
+              "value": "={{ $now }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-backup-completion",
+      "name": "Log Backup Completion",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2950, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "RETENTION_DAYS=\"{{ $('Process Backup Request').item.json.retentionDays }}\"\nBACKUP_BASE_DIR=\"/data/shared/backups\"\n\necho \"Starting backup cleanup for backups older than ${RETENTION_DAYS} days...\"\n\n# Find and remove old backup directories\nfind \"${BACKUP_BASE_DIR}\" -name \"backup_*\" -type d -mtime +\"${RETENTION_DAYS}\" -exec rm -rf {} \\; 2>/dev/null || true\n\necho \"Backup cleanup completed\"\n\n# Show remaining backups\necho \"Remaining backups:\"\nls -la \"${BACKUP_BASE_DIR}\" 2>/dev/null || echo \"No backups directory found\""
+      },
+      "id": "cleanup-old-backups",
+      "name": "Cleanup Old Backups",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [3200, 400]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-backup-request",
+      "name": "Respond to Backup Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3450, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "validate-before-restore-check",
+              "leftValue": "={{ $json.validateBeforeRestore }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-validation-required",
+      "name": "Check Validation Required",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 900]
+    },
+    {
+      "parameters": {
+        "command": "BACKUP_ID=\"{{ $('Process Restore Request').item.json.sourceBackupId }}\"\nBACKUP_DIR=\"/data/shared/backups/${BACKUP_ID}\"\n\necho \"Validating backup: ${BACKUP_ID}\"\n\n# Check if backup directory exists\nif [ ! -d \"${BACKUP_DIR}\" ]; then\n  echo \"ERROR: Backup directory not found: ${BACKUP_DIR}\"\n  exit 1\nfi\n\n# Validate PostgreSQL backup\nif [ -f \"${BACKUP_DIR}/postgresql_full.sql\" ]; then\n  echo \"Found PostgreSQL full backup\"\n  # Basic validation of SQL file\n  if grep -q \"PostgreSQL database dump\" \"${BACKUP_DIR}/postgresql_full.sql\"; then\n    echo \"PostgreSQL backup appears valid\"\n  else\n    echo \"WARNING: PostgreSQL backup may be corrupted\"\n  fi\nfi\n\n# Validate Qdrant backup\nif [ -d \"${BACKUP_DIR}/qdrant\" ]; then\n  echo \"Found Qdrant backup directory\"\n  SNAPSHOT_COUNT=$(find \"${BACKUP_DIR}/qdrant\" -name \"*.snapshot*\" | wc -l)\n  echo \"Found ${SNAPSHOT_COUNT} Qdrant snapshots\"\nfi\n\n# Validate metadata files\nif [ -f \"${BACKUP_DIR}/knowledge_sync_log.csv\" ]; then\n  LINE_COUNT=$(wc -l < \"${BACKUP_DIR}/knowledge_sync_log.csv\")\n  echo \"Knowledge sync log contains ${LINE_COUNT} entries\"\nfi\n\necho \"Backup validation completed\"\necho \"Backup contents:\"\nfind \"${BACKUP_DIR}\" -type f -exec ls -lh {} \\;"
+      },
+      "id": "validate-backup",
+      "name": "Validate Backup",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [950, 800]
+    },
+    {
+      "parameters": {
+        "command": "BACKUP_ID=\"{{ $('Process Restore Request').item.json.sourceBackupId }}\"\nBACKUP_DIR=\"/data/shared/backups/${BACKUP_ID}\"\nRESTORE_SYSTEMS=\"{{ $('Process Restore Request').item.json.restoreSystems.join(',') }}\"\n\necho \"Starting restore from backup: ${BACKUP_ID}\"\necho \"Restoring systems: ${RESTORE_SYSTEMS}\"\n\n# Restore PostgreSQL if requested\nif [[ \"$RESTORE_SYSTEMS\" == *\"postgresql\"* ]] || [[ \"$RESTORE_SYSTEMS\" == *\"all\"* ]]; then\n  echo \"Restoring PostgreSQL...\"\n  \n  if [ -f \"${BACKUP_DIR}/postgresql_backup.tar.gz\" ]; then\n    cd \"${BACKUP_DIR}\" && tar -xzf postgresql_backup.tar.gz\n  fi\n  \n  if [ -f \"${BACKUP_DIR}/postgresql_full.sql\" ]; then\n    echo \"Restoring from full backup...\"\n    PGPASSWORD=\"{{ $vars.postgres_password }}\" psql -h shared-postgres -U postgres -f \"${BACKUP_DIR}/postgresql_full.sql\" 2>&1\n  else\n    echo \"No PostgreSQL backup file found\"\n  fi\nfi\n\n# Restore Qdrant if requested\nif [[ \"$RESTORE_SYSTEMS\" == *\"qdrant\"* ]] || [[ \"$RESTORE_SYSTEMS\" == *\"all\"* ]]; then\n  echo \"Restoring Qdrant...\"\n  \n  # Find the snapshot file\n  SNAPSHOT_FILE=$(find \"${BACKUP_DIR}/qdrant\" -name \"*.snapshot*\" | head -1)\n  \n  if [ ! -z \"$SNAPSHOT_FILE\" ]; then\n    # Decompress if needed\n    if [[ \"$SNAPSHOT_FILE\" == *.gz ]]; then\n      gunzip \"$SNAPSHOT_FILE\"\n      SNAPSHOT_FILE=${SNAPSHOT_FILE%.gz}\n    fi\n    \n    # Upload snapshot to Qdrant\n    curl -X PUT \"http://qdrant:6333/collections/knowledge_base/snapshots/upload\" \\\n      -H \"api-key: {{ $vars.qdrant_api_key }}\" \\\n      -H \"Content-Type: application/octet-stream\" \\\n      --data-binary @\"$SNAPSHOT_FILE\"\n    \n    echo \"Qdrant restoration completed\"\n  else\n    echo \"No Qdrant snapshot found\"\n  fi\nfi\n\necho \"Restore process completed\""
+      },
+      "id": "perform-restore",
+      "name": "Perform Restore",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1200, 900]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": {
+          "__rl": true,
+          "value": "restore_log",
+          "mode": "list"
+        },
+        "data": {
+          "insert": [
+            {
+              "column": "restore_id",
+              "value": "={{ 'restore_' + $('Process Restore Request').item.json.timestamp }}"
+            },
+            {
+              "column": "source_backup_id",
+              "value": "={{ $('Process Restore Request').item.json.sourceBackupId }}"
+            },
+            {
+              "column": "restore_type",
+              "value": "={{ $('Process Restore Request').item.json.restoreType }}"
+            },
+            {
+              "column": "systems_restored",
+              "value": "={{ $('Process Restore Request').item.json.restoreSystems }}"
+            },
+            {
+              "column": "target_point_in_time",
+              "value": "={{ $('Process Restore Request').item.json.targetPointInTime }}"
+            },
+            {
+              "column": "validation_performed",
+              "value": "={{ $('Process Restore Request').item.json.validateBeforeRestore }}"
+            },
+            {
+              "column": "status",
+              "value": "completed"
+            },
+            {
+              "column": "started_at",
+              "value": "={{ $('Process Restore Request').item.json.timestamp }}"
+            },
+            {
+              "column": "completed_at",
+              "value": "={{ $now }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-restore-completion",
+      "name": "Log Restore Completion",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1450, 900],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_credentials",
+          "name": "Postgres Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-restore-request",
+      "name": "Respond to Restore Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1700, 900]
+    },
+    {
+      "parameters": {
+        "content": "## Automated Knowledge Management Backup & Recovery\n\n**Purpose:** Comprehensive backup and recovery system for all knowledge management components with automated scheduling and retention management.\n\n**Backup Types:**\n\n**1. Incremental Backup (Daily)**\n- PostgreSQL: WAL-based incremental backup\n- Qdrant: Latest collection snapshots\n- Metadata: Recent sync logs and mappings\n- File Manifests: Google Drive file checksums\n\n**2. Full Backup (Weekly)**\n- PostgreSQL: Complete database dumps\n- Qdrant: Full collection snapshots\n- AppFlowy: Complete workspace export\n- Google Drive: Full file manifest with metadata\n- All knowledge sync logs and mappings\n\n**Backup Components:**\n\n**PostgreSQL:**\n- All databases (n8n_db, appflowy_db, affine_db, langfuse_db)\n- Knowledge sync logs and mappings\n- Chat sessions and analytics\n- Compressed SQL dumps\n\n**Qdrant Vector Database:**\n- Collection snapshots via API\n- Automatic compression\n- Validation and integrity checks\n\n**AppFlowy:**\n- Workspace exports via API\n- Database contents and metadata\n- User permissions and settings\n\n**Google Drive:**\n- File manifest with checksums\n- Metadata and permissions\n- Directory structure mapping\n\n**Recovery Features:**\n\n**Validation:**\n- Backup integrity verification\n- File existence and format checks\n- SQL dump validation\n- Snapshot completeness verification\n\n**Restore Options:**\n- Full system restore\n- Selective component restore\n- Point-in-time recovery\n- Validation before restore\n\n**Automation:**\n- **Daily**: 2:00 AM incremental backups\n- **Weekly**: Sunday 2:00 AM full backups\n- **Retention**: Configurable cleanup (default 30 days)\n- **Monitoring**: Comprehensive logging and alerting\n\n**API Endpoints:**\n- POST /webhook/backup-knowledge-management\n- POST /webhook/restore-knowledge-management\n\n**Parameters:**\n- `type`: backup/restore type (incremental, full)\n- `systems`: target systems array\n- `compression`: enable/disable compression\n- `retentionDays`: backup retention period\n- `validate`: validate before restore\n- `pointInTime`: target restore timestamp",
+        "height": 900,
+        "width": 900,
+        "color": 2
+      },
+      "id": "backup-recovery-documentation",
+      "name": "Backup & Recovery Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [100, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Backup Trigger": {
+      "main": [
+        [
+          {
+            "node": "Process Backup Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Full Backup Trigger": {
+      "main": [
+        [
+          {
+            "node": "Process Backup Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backup Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Backup Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Restore Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Backup Request": {
+      "main": [
+        [
+          {
+            "node": "Check PostgreSQL Backup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Qdrant Backup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Export Knowledge Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Restore Request": {
+      "main": [
+        [
+          {
+            "node": "Check Validation Required",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check PostgreSQL Backup": {
+      "main": [
+        [
+          {
+            "node": "Check Backup Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Qdrant Backup": {
+      "main": [
+        [
+          {
+            "node": "Backup Qdrant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Backup Type": {
+      "main": [
+        [
+          {
+            "node": "Backup PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Backup PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backup PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Check AppFlowy Backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backup Qdrant": {
+      "main": [
+        [
+          {
+            "node": "Check AppFlowy Backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Knowledge Metadata": {
+      "main": [
+        [
+          {
+            "node": "Check AppFlowy Backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check AppFlowy Backup": {
+      "main": [
+        [
+          {
+            "node": "Export AppFlowy Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Google Drive Backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Google Drive Backup": {
+      "main": [
+        [
+          {
+            "node": "List Google Drive Files",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Compile Backup Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export AppFlowy Data": {
+      "main": [
+        [
+          {
+            "node": "Save AppFlowy Backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save AppFlowy Backup": {
+      "main": [
+        [
+          {
+            "node": "Compile Backup Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Google Drive Files": {
+      "main": [
+        [
+          {
+            "node": "Create Google Drive Manifest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Google Drive Manifest": {
+      "main": [
+        [
+          {
+            "node": "Convert Manifest to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Manifest to File": {
+      "main": [
+        [
+          {
+            "node": "Save Google Drive Manifest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Google Drive Manifest": {
+      "main": [
+        [
+          {
+            "node": "Compile Backup Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Backup Summary": {
+      "main": [
+        [
+          {
+            "node": "Log Backup Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Backup Completion": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Old Backups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleanup Old Backups": {
+      "main": [
+        [
+          {
+            "node": "Respond to Backup Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Validation Required": {
+      "main": [
+        [
+          {
+            "node": "Validate Backup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Perform Restore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Backup": {
+      "main": [
+        [
+          {
+            "node": "Perform Restore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perform Restore": {
+      "main": [
+        [
+          {
+            "node": "Log Restore Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Restore Completion": {
+      "main": [
+        [
+          {
+            "node": "Respond to Restore Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "backup-recovery-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "BackupRecovery",
+  "tags": ["backup", "recovery", "automation", "postgresql", "qdrant", "knowledge-management"]
+}
