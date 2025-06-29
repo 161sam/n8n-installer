@@ -3,8 +3,8 @@
   "nodes": [
     {
       "parameters": {},
-      "id": "enhanced-postgres-chat-memory",
-      "name": "Enhanced Postgres Chat Memory",
+      "id": "local-rag-ai-agent-postgres-chat-memory",
+      "name": "Local RAG AI Agent Postgres Chat Memory",
       "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
       "typeVersion": 1.1,
       "position": [1040, 560],
@@ -20,8 +20,8 @@
         "model": "llama3.1:latest",
         "options": {}
       },
-      "id": "enhanced-ollama-chat-model",
-      "name": "Enhanced Ollama Chat Model",
+      "id": "local-rag-ai-agent-ollama-chat-model",
+      "name": "Local RAG AI Agent Ollama Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [920, 560],
@@ -37,8 +37,8 @@
         "model": "llama3.1:latest",
         "options": {}
       },
-      "id": "enhanced-ollama-model",
-      "name": "Enhanced Ollama Model",
+      "id": "local-rag-ai-agent-ollama-model",
+      "name": "Local RAG AI Agent Ollama Model",
       "type": "@n8n/n8n-nodes-langchain.lmOllama",
       "typeVersion": 1,
       "position": [1960, 500],
@@ -98,8 +98,8 @@
       "parameters": {
         "model": "nomic-embed-text:latest"
       },
-      "id": "enhanced-embeddings-ollama",
-      "name": "Enhanced Embeddings Ollama",
+      "id": "local-rag-ai-agent-embeddings-ollama",
+      "name": "Local RAG AI Agent Embeddings Ollama",
       "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
       "typeVersion": 1,
       "position": [1840, 600],
@@ -114,12 +114,12 @@
       "parameters": {
         "options": {}
       },
-      "id": "enhanced-chat-trigger",
-      "name": "Enhanced Chat Trigger",
+      "id": "local-rag-ai-agent-chat-trigger",
+      "name": "Local RAG AI Agent Chat Trigger",
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
       "typeVersion": 1.1,
       "position": [620, 340],
-      "webhookId": "enhanced-chat-trigger"
+      "webhookId": "local-rag-ai-agent-chat-trigger"
     },
     {
       "parameters": {
@@ -131,8 +131,8 @@
         },
         "options": {}
       },
-      "id": "enhanced-qdrant-vector-store",
-      "name": "Enhanced Qdrant Vector Store",
+      "id": "local-rag-ai-agent-qdrant-vector-store",
+      "name": "Local RAG AI Agent Qdrant Vector Store",
       "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
       "typeVersion": 1,
       "position": [1560, 480],
@@ -147,8 +147,8 @@
       "parameters": {
         "options": {}
       },
-      "id": "enhanced-respond-to-webhook",
-      "name": "Enhanced Respond to Webhook",
+      "id": "local-rag-ai-agent-respond-to-webhook",
+      "name": "Local RAG AI Agent Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [1340, 340]
@@ -156,27 +156,27 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "enhanced-rag-agent",
+        "path": "local-rag-ai-agent-rag-agent",
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "enhanced-webhook",
-      "name": "Enhanced Webhook",
+      "id": "local-rag-ai-agent-webhook",
+      "name": "Local RAG AI Agent Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [620, 520],
-      "webhookId": "enhanced-rag-agent"
+      "webhookId": "local-rag-ai-agent-rag-agent"
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "You are an enhanced AI assistant with access to a comprehensive knowledge management system. You can access information from:\n\n1. **AppFlowy**: Project management, notes, databases, and wikis\n2. **Affine**: Collaborative documents, whiteboards, and workspaces  \n3. **Google Drive**: Files, documents, and meeting notes\n4. **Vector Database**: Semantic search across all integrated content\n\nWhen answering questions:\n- Use the most relevant and up-to-date information from all available sources\n- Cite your sources when providing information (e.g., \"According to the AppFlowy project database...\")\n- If information is available in multiple sources, provide a comprehensive view\n- Suggest relevant actions or next steps when appropriate\n- If you need more specific information, use the appropriate query tools\n\nAlways be helpful, accurate, and provide context about where information comes from.",
+        "text": "You are an Local RAG AI Agent AI assistant with access to a comprehensive knowledge management system. You can access information from:\n\n1. **AppFlowy**: Project management, notes, databases, and wikis\n2. **Affine**: Collaborative documents, whiteboards, and workspaces  \n3. **Google Drive**: Files, documents, and meeting notes\n4. **Vector Database**: Semantic search across all integrated content\n\nWhen answering questions:\n- Use the most relevant and up-to-date information from all available sources\n- Cite your sources when providing information (e.g., \"According to the AppFlowy project database...\")\n- If information is available in multiple sources, provide a comprehensive view\n- Suggest relevant actions or next steps when appropriate\n- If you need more specific information, use the appropriate query tools\n\nAlways be helpful, accurate, and provide context about where information comes from.",
         "options": {
-          "systemMessage": "You are an enhanced knowledge management AI assistant with access to AppFlowy, Affine, Google Drive, and a comprehensive vector database. Always provide helpful, accurate responses with proper source attribution."
+          "systemMessage": "You are an Local RAG AI Agent knowledge management AI assistant with access to AppFlowy, Affine, Google Drive, and a comprehensive vector database. Always provide helpful, accurate responses with proper source attribution."
         }
       },
-      "id": "enhanced-ai-agent",
-      "name": "Enhanced AI Agent",
+      "id": "local-rag-ai-agent-ai-agent",
+      "name": "Local RAG AI Agent AI Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 1.6,
       "position": [1000, 340]
@@ -186,13 +186,13 @@
         "assignments": {
           "assignments": [
             {
-              "id": "enhanced-chat-input",
+              "id": "local-rag-ai-agent-chat-input",
               "name": "chatInput",
               "value": "={{ $json?.chatInput || $json.body?.chatInput || $json.body?.message || $json.message }}",
               "type": "string"
             },
             {
-              "id": "enhanced-session-id",
+              "id": "local-rag-ai-agent-session-id",
               "name": "sessionId",
               "value": "={{ $json?.sessionId || $json.body?.sessionId || 'default-session' }}",
               "type": "string"
@@ -213,8 +213,8 @@
         },
         "options": {}
       },
-      "id": "enhanced-edit-fields",
-      "name": "Enhanced Edit Fields",
+      "id": "local-rag-ai-agent-edit-fields",
+      "name": "Local RAG AI Agent Edit Fields",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [820, 340]
@@ -231,15 +231,15 @@
           "insert": [
             {
               "column": "session_id",
-              "value": "={{ $('Enhanced Edit Fields').item.json.sessionId }}"
+              "value": "={{ $('Local RAG AI Agent Edit Fields').item.json.sessionId }}"
             },
             {
               "column": "user_input",
-              "value": "={{ $('Enhanced Edit Fields').item.json.chatInput }}"
+              "value": "={{ $('Local RAG AI Agent Edit Fields').item.json.chatInput }}"
             },
             {
               "column": "knowledge_context",
-              "value": "={{ $('Enhanced Edit Fields').item.json.knowledgeContext }}"
+              "value": "={{ $('Local RAG AI Agent Edit Fields').item.json.knowledgeContext }}"
             },
             {
               "column": "timestamp",
@@ -247,7 +247,7 @@
             },
             {
               "column": "response",
-              "value": "={{ $('Enhanced AI Agent').item.json.output }}"
+              "value": "={{ $('Local RAG AI Agent AI Agent').item.json.output }}"
             }
           ]
         },
@@ -267,13 +267,13 @@
     },
     {
       "parameters": {
-        "content": "## Enhanced RAG AI Agent with Knowledge Management\n\n**Purpose:** Advanced AI assistant with integrated access to AppFlowy, Affine, Google Drive, and vector database.\n\n**Key Features:**\n- Semantic search across all knowledge sources\n- Direct query tools for AppFlowy and Affine\n- Cross-platform content correlation\n- Source attribution and metadata\n- Enhanced context awareness\n- Session logging and analytics\n\n**Tools Available:**\n1. Knowledge Base Vector Search\n2. AppFlowy Direct Query\n3. Affine Direct Query  \n4. Cross-Platform Search\n5. Google Drive Integration\n\n**Usage:**\n- Chat interface with natural language queries\n- Webhook API for integration with other systems\n- Supports complex multi-source research queries",
+        "content": "## Local RAG AI Agent RAG AI Agent with Knowledge Management\n\n**Purpose:** Advanced AI assistant with integrated access to AppFlowy, Affine, Google Drive, and vector database.\n\n**Key Features:**\n- Semantic search across all knowledge sources\n- Direct query tools for AppFlowy and Affine\n- Cross-platform content correlation\n- Source attribution and metadata\n- Local RAG AI Agent context awareness\n- Session logging and analytics\n\n**Tools Available:**\n1. Knowledge Base Vector Search\n2. AppFlowy Direct Query\n3. Affine Direct Query  \n4. Cross-Platform Search\n5. Google Drive Integration\n\n**Usage:**\n- Chat interface with natural language queries\n- Webhook API for integration with other systems\n- Supports complex multi-source research queries",
         "height": 600,
         "width": 700,
         "color": 6
       },
-      "id": "enhanced-workflow-documentation",
-      "name": "Enhanced Workflow Documentation",
+      "id": "local-rag-ai-agent-workflow-documentation",
+      "name": "Local RAG AI Agent Workflow Documentation",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [200, 100]
@@ -426,29 +426,29 @@
   ],
   "pinData": {},
   "connections": {
-    "Enhanced Postgres Chat Memory": {
+    "Local RAG AI Agent Postgres Chat Memory": {
       "ai_memory": [
         [
           {
-            "node": "Enhanced AI Agent",
+            "node": "Local RAG AI Agent AI Agent",
             "type": "ai_memory",
             "index": 0
           }
         ]
       ]
     },
-    "Enhanced Ollama Chat Model": {
+    "Local RAG AI Agent Ollama Chat Model": {
       "ai_languageModel": [
         [
           {
-            "node": "Enhanced AI Agent",
+            "node": "Local RAG AI Agent AI Agent",
             "type": "ai_languageModel",
             "index": 0
           }
         ]
       ]
     },
-    "Enhanced Ollama Model": {
+    "Local RAG AI Agent Ollama Model": {
       "ai_languageModel": [
         [
           {
@@ -474,29 +474,29 @@
         ]
       ]
     },
-    "Enhanced Embeddings Ollama": {
+    "Local RAG AI Agent Embeddings Ollama": {
       "ai_embedding": [
         [
           {
-            "node": "Enhanced Qdrant Vector Store",
+            "node": "Local RAG AI Agent Qdrant Vector Store",
             "type": "ai_embedding",
             "index": 0
           }
         ]
       ]
     },
-    "Enhanced Chat Trigger": {
+    "Local RAG AI Agent Chat Trigger": {
       "main": [
         [
           {
-            "node": "Enhanced Edit Fields",
+            "node": "Local RAG AI Agent Edit Fields",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Enhanced Qdrant Vector Store": {
+    "Local RAG AI Agent Qdrant Vector Store": {
       "ai_vectorStore": [
         [
           {
@@ -507,11 +507,11 @@
         ]
       ]
     },
-    "Enhanced Webhook": {
+    "Local RAG AI Agent Webhook": {
       "main": [
         [
           {
-            "node": "Enhanced Edit Fields",
+            "node": "Local RAG AI Agent Edit Fields",
             "type": "main",
             "index": 0
           },
@@ -523,11 +523,11 @@
         ]
       ]
     },
-    "Enhanced AI Agent": {
+    "Local RAG AI Agent AI Agent": {
       "main": [
         [
           {
-            "node": "Enhanced Respond to Webhook",
+            "node": "Local RAG AI Agent Respond to Webhook",
             "type": "main",
             "index": 0
           },
@@ -539,11 +539,11 @@
         ]
       ]
     },
-    "Enhanced Edit Fields": {
+    "Local RAG AI Agent Edit Fields": {
       "main": [
         [
           {
-            "node": "Enhanced AI Agent",
+            "node": "Local RAG AI Agent AI Agent",
             "type": "main",
             "index": 0
           }
@@ -554,7 +554,7 @@
       "ai_tool": [
         [
           {
-            "node": "Enhanced AI Agent",
+            "node": "Local RAG AI Agent AI Agent",
             "type": "ai_tool",
             "index": 0
           }
@@ -565,7 +565,7 @@
       "ai_tool": [
         [
           {
-            "node": "Enhanced AI Agent",
+            "node": "Local RAG AI Agent AI Agent",
             "type": "ai_tool",
             "index": 1
           }
@@ -576,7 +576,7 @@
       "ai_tool": [
         [
           {
-            "node": "Enhanced AI Agent",
+            "node": "Local RAG AI Agent AI Agent",
             "type": "ai_tool",
             "index": 2
           }
@@ -587,7 +587,7 @@
       "ai_tool": [
         [
           {
-            "node": "Enhanced AI Agent",
+            "node": "Local RAG AI Agent AI Agent",
             "type": "ai_tool",
             "index": 3
           }
@@ -650,11 +650,11 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "enhanced-rag-v1",
+  "versionId": "local-rag-ai-agent-rag-v1",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "enhanced-rag-agent"
+    "instanceId": "local-rag-ai-agent-rag-agent"
   },
-  "id": "EnhancedRAGAgent",
-  "tags": ["ai-agent", "rag", "knowledge-management", "enhanced", "appflowy", "affine"]
+  "id": "Local RAG AI AgentRAGAgent",
+  "tags": ["ai-agent", "rag", "knowledge-management", "Local RAG AI Agent", "appflowy", "affine"]
 }
