@@ -1293,7 +1293,109 @@ services:
       resources:
         limits:
           memory: 2G
-          cpus: '1.0'
+      cpus: '1.0'
+
+  # Agent-NN Multi-Agent Framework
+  agentnn-redis:
+    image: redis:7
+    container_name: agentnn-redis
+    profiles: ["agent-nn"]
+    <<: *restart-policy
+    <<: *default-logging
+    networks:
+      - internal_network
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "redis-cli", "ping"]
+
+  agentnn-session-manager:
+    image: ghcr.io/ecospherNetwork/agent-nn/session_manager:latest
+    container_name: agentnn-session-manager
+    profiles: ["agent-nn"]
+    <<: *restart-policy
+    <<: *default-logging
+    environment:
+      <<: *common-env
+      REDIS_HOST: agentnn-redis
+    depends_on:
+      - agentnn-redis
+    networks:
+      - internal_network
+
+  agentnn-registry:
+    image: ghcr.io/ecospherNetwork/agent-nn/registry:latest
+    container_name: agentnn-registry
+    profiles: ["agent-nn"]
+    <<: *restart-policy
+    <<: *default-logging
+    networks:
+      - internal_network
+
+  agentnn-vector-store:
+    image: ghcr.io/ecospherNetwork/agent-nn/vector_store:latest
+    container_name: agentnn-vector-store
+    profiles: ["agent-nn"]
+    <<: *restart-policy
+    <<: *default-logging
+    volumes:
+      - agentnn_vector_data:/data
+    networks:
+      - internal_network
+
+  agentnn-llm-gateway:
+    image: ghcr.io/ecospherNetwork/agent-nn/llm_gateway:latest
+    container_name: agentnn-llm-gateway
+    profiles: ["agent-nn"]
+    <<: *restart-policy
+    <<: *default-logging
+    environment:
+      <<: *common-env
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+    networks:
+      - internal_network
+
+  agentnn-dispatcher:
+    image: ghcr.io/ecospherNetwork/agent-nn/dispatcher:latest
+    container_name: agentnn-dispatcher
+    profiles: ["agent-nn"]
+    <<: *restart-policy
+    <<: *default-logging
+    depends_on:
+      - agentnn-registry
+      - agentnn-session-manager
+      - agentnn-vector-store
+      - agentnn-llm-gateway
+    networks:
+      - internal_network
+
+  agentnn-worker-dev:
+    image: ghcr.io/ecospherNetwork/agent-nn/worker_dev:latest
+    container_name: agentnn-worker-dev
+    profiles: ["agent-nn"]
+    <<: *restart-policy
+    <<: *default-logging
+    networks:
+      - internal_network
+
+  agentnn-worker-loh:
+    image: ghcr.io/ecospherNetwork/agent-nn/worker_loh:latest
+    container_name: agentnn-worker-loh
+    profiles: ["agent-nn"]
+    <<: *restart-policy
+    <<: *default-logging
+    networks:
+      - internal_network
+
+  agentnn-worker-openhands:
+    image: ghcr.io/ecospherNetwork/agent-nn/worker_openhands:latest
+    container_name: agentnn-worker-openhands
+    profiles: ["agent-nn"]
+    <<: *restart-policy
+    <<: *default-logging
+    networks:
+      - internal_network
 
   # =============================================================================
   # MODEL PULLING SERVICES (One-time execution)

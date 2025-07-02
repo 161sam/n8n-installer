@@ -378,6 +378,22 @@ letta.{$USER_DOMAIN_NAME:localhost} {
     
     encode gzip
 }
+# Agent-NN API
+agentnn.{$USER_DOMAIN_NAME:localhost} {
+    reverse_proxy agentnn-dispatcher:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    log {
+        output file /var/log/caddy/agentnn.log
+    }
+
+    encode gzip
+}
+
 
 # =============================================================================
 # DEVELOPMENT ENVIRONMENT (Optional code-server)
