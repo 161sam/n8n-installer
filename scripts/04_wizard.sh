@@ -235,7 +235,7 @@ You can choose between multiple editor options:
    • Web-based access options
 
 Would you like to configure your development editor now?
-(You can also run this later with: python _editor_selection.py)" 18 85
+(You can also run this later with: python scripts/editor_selection.py)" 18 85
         
         if [ $? -eq 0 ]; then
             run_editor_selection
@@ -245,8 +245,8 @@ Would you like to configure your development editor now?
 
 # Function to run editor selection
 run_editor_selection() {
-    # Check if the  editor selection script exists
-    local editor_script="$PROJECT_ROOT/_editor_selection.py"
+    # Check if the editor selection script exists
+    local editor_script="$PROJECT_ROOT/scripts/editor_selection.py"
     
     if [ ! -f "$editor_script" ]; then
         whiptail --title "Editor Selection" --msgbox \
