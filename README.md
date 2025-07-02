@@ -164,6 +164,11 @@ After successful installation, your services are up and running! Here's how to g
 5.  **Check Monitoring (Optional):**
     - Visit Grafana (`grafana.yourdomain.com`) to see dashboards monitoring your system's performance (data sourced from Prometheus).
 
+6.  **Set Up the Zed Editor (Optional):**
+    - Run `python scripts/editor_selection.py` to generate an installation script.
+    - Execute the script in `editor-config/` to install Zed.
+    - See [docs/zed_editor_setup.md](docs/zed_editor_setup.md) for details.
+
 ### Proxmox Deployment with LXD
 
 Use the helper scripts when deploying on Proxmox:
