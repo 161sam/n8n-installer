@@ -485,7 +485,7 @@ show_development_environment() {
         echo "   🐳 Container Options - Isolated development environments"
         echo ""
         echo "💡 Setup Instructions:"
-        echo "   🔧 Run: python editor_selection.py"
+        echo "   🔧 Run: python scripts/editor_selection.py"
         echo "   📋 Follow interactive configuration wizard"
     fi
     
@@ -1046,7 +1046,7 @@ show_quick_access_guide() {
         echo "   📁 Open projects: $editor_type ~/Projects/"
         echo "   🔧 Editor config: ~/.config/$editor_type/"
     else
-        echo "   🎨 Setup editor: python editor_selection.py"
+        echo "   🎨 Setup editor: python scripts/editor_selection.py"
     fi
     
     echo "   📂 Project directory: cd ~/Projects/"

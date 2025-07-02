@@ -396,7 +396,7 @@ class EnhancedWorkspaceManager:
         print("🎨 Starting editor selection and configuration...")
         
         # Check if editor-selection script exists
-        selection_script = self.project_root / "enhanced_editor_selection.py"
+        selection_script = self.project_root / "scripts/editor_selection.py"
         if not selection_script.exists():
             print("❌ Editor selection script not found. Skipping editor setup.")
             return
@@ -814,7 +814,7 @@ Happy coding! ✨
                 print(f"   💡 Install with: bash editor-config/install-selected-editor.sh")
         else:
             print("   ⚠️  No editor configured")
-            print("   🎨 Setup editor: python editor_selection.py")
+            print("   🎨 Setup editor: python scripts/editor_selection.py")
         
         # Infrastructure Services
         infrastructure_services = ['monitoring', 'langfuse', 'supabase']
