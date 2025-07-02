@@ -48,6 +48,7 @@ The installer also makes the following powerful open-source tools **available fo
 ✅ [**Crawl4ai**](https://github.com/Alfresco/crawl4ai) - A flexible web crawler designed for AI, enabling you to extract data from websites for your projects.
 
 ✅ [**Letta**](https://docs.letta.com/) - An open-source agent server and SDK that can be connected to various LLM API backends (OpenAI, Anthropic, Ollama, etc.), enabling you to build and manage AI agents.
+✅ [**Agent-NN**](https://github.com/EcoSphereNetwork/Agent-NN) - Modular multi-agent system with dispatcher and worker services.
 
 ✅ [**Weaviate**](https://weaviate.io/) - An open-source AI-native vector database with a focus on scalability and ease of use. It can be used for RAG, hybrid search, and more.
 
@@ -133,6 +134,7 @@ After successful installation, your services are up and running! Here's how to g
     - **Supabase (Dashboard):** `supabase.yourdomain.com`
     - **Langfuse:** `langfuse.yourdomain.com`
     - **Letta:** `letta.yourdomain.com`
+    - **Agent-NN:** `agentnn.yourdomain.com`
     - **Weaviate:** `weaviate.yourdomain.com`
     - **Neo4j:** `neo4j.yourdomain.com`
     - **Grafana:** `grafana.yourdomain.com`
