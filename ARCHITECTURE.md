@@ -22,12 +22,13 @@ Alle Datenfl\u00fcsse laufen durch eine einheitliche Integrations- und Automatis
 * Verarbeitet Webhooks, API-Aufrufe und Datenbank\u00e4nderungen, um neue Inhalte automatisch zwischen AppFlowy, AFFiNE, Supabase, Qdrant, Weaviate & weiteren Tools zu synchronisieren.
 * Generiert bei neuen oder ge\u00e4nderten Inhalten Embeddings (via Ollama + LLM) und speichert diese in der Vektor-Datenbank.
 
-### 2.3. KI-Layer: LLM-Agent (Local_RAG_AI_Agent_n8n_Workflow.json)
+### 2.3. KI-Layer: LLM-Agent & Agent-NN
 
 * Lokaler, containerisierter LLM-Agent (z.B. Local_RAG_AI_Agent_n8n_Workflow.json).
 * **Retrieval-Augmented Generation (RAG):** Holt sich Kontext via Embedding-\u00c4hnlichkeitssuche (Qdrant, Weaviate, Supabase/pgvector).
 * Beantwortet semantische Anfragen aus allen Frontends/Workflows (AppFlowy-AI, AFFiNE-AI, Open WebUI, n8n, CLI).
 * **Flowise/Letta** (optional): Erlaubt Bau/Orchestrierung von Multi-Agenten-Workflows mit Memory und Tool-Anbindung.
+* **Agent-NN** (optional): Modulares Multi-Agenten-System mit Dispatcher und spezialisierten Worker-Diensten.
 
 ---
 
@@ -93,6 +94,7 @@ flowchart TD
   subgraph KI-Layer
     LLM(Ollama LLM-Agent)
     FLW(Flowise/Letta)
+    AGN(Agent-NN)
   end
 
   AF <--> SB
@@ -104,14 +106,17 @@ flowchart TD
   N8 <--> SB
   N8 <--> LLM
   N8 <--> FLW
+  N8 <--> AGN
   LLM <--> QD
   LLM <--> WV
   LLM <--> SB
+  AGN <--> LLM
   OW <--> LLM
   AF <--> LLM
   AFF <--> LLM
   CLI <--> LLM
   FLW <--> LLM
+  FLW <--> AGN
   S3 <--> AFF
   S3 <--> SB
 ```
@@ -123,7 +128,8 @@ flowchart TD
 * **AppFlowy und AFFiNE** sind die benutzerzentrierten Knowledge Hubs (verschiedene Rollen/Workflows, aber gemeinsamer Wissensspeicher).
 * **Supabase, Qdrant, Weaviate** halten strukturierte Daten und Embeddings, f\u00fcr schnelle Suche und KI-RAG.
 * **n8n** steuert alle Datenfl\u00fcsse, Synchronisationen und Trigger.
-* **LLM-Agent (Ollama)** liefert Kontext-Antworten und kann \u00fcber verschiedenste Frontends, Chat- und Automatisierungstools angesprochen werden.
+* **LLM-Agent (Ollama)** liefert Antworten und ist über diverse Frontends oder Automatisierungstools nutzbar.
+* **Agent-NN** erweitert den KI-Layer um ein verteiltes Multi-Agenten-System für komplexe Aufgaben.
 * **Sicherheit & Monitoring** sind von Beginn an integriert.
 
 ---
