@@ -163,6 +163,15 @@ After successful installation, your services are up and running! Here's how to g
 5.  **Check Monitoring (Optional):**
     - Visit Grafana (`grafana.yourdomain.com`) to see dashboards monitoring your system's performance (data sourced from Prometheus).
 
+### Proxmox Deployment with LXD
+
+Use the helper scripts when deploying on Proxmox:
+
+- `proxmox-vm-deployment.sh` sets up a dedicated virtual machine.
+- `proxmox-lxd-deployment.sh` launches an LXD container prepared with Docker and this repository. Attach to the container and run the installer inside.
+
+Detailed steps are available in [docs/proxmox_lxd_setup.md](docs/proxmox_lxd_setup.md).
+
 ### Using Pre-installed Libraries in n8n's Custom JavaScript
 
 This setup pre-installs useful Node.js libraries for use in n8n's Code nodes, allowing you to write custom JavaScript snippets with enhanced capabilities:
