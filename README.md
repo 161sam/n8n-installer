@@ -49,7 +49,7 @@ The installer also makes the following powerful open-source tools **available fo
 
 ✅ [**Letta**](https://docs.letta.com/) - An open-source agent server and SDK that can be connected to various LLM API backends (OpenAI, Anthropic, Ollama, etc.), enabling you to build and manage AI agents.
 
-✅ [**Agent-NN**](https://github.com/EcoSphereNetwork/Agent-NN) - Modular multi-agent system with dispatcher and worker services.
+✅ [**Agent-NN**](https://github.com/EcoSphereNetwork/Agent-NN) - Modular multi-agent system with neural networks for dispatcher and worker services.
 
 ✅ [**Weaviate**](https://weaviate.io/) - An open-source AI-native vector database with a focus on scalability and ease of use. It can be used for RAG, hybrid search, and more.
 
