@@ -23,6 +23,7 @@ This setup provides a comprehensive suite of cutting-edge services, all pre-conf
 ### What's Included
 
 ✅ [**Self-hosted n8n**](https://n8n.io/) - A low-code platform with over 400 integrations and advanced AI components to automate workflows.
+
 ✅ **Caddy, Postgres, and Redis** - Core services for web proxy, database, and caching, which are always included.
 
 The installer also makes the following powerful open-source tools **available for you to select and deploy** via an interactive wizard during setup:
@@ -36,6 +37,8 @@ The installer also makes the following powerful open-source tools **available fo
 ✅ [**AppFlowy**](https://appflowy.io/) - An open-source Notion alternative for knowledge management. Create wikis, take notes, manage projects, and collaborate with teams using a modern block-based editor with AI capabilities.
 
 ✅ [**Affine**](https://affine.pro/) - A next-generation collaborative workspace that combines the best of Notion, Miro, and Monday. Features real-time collaboration, block-based editing, and powerful database capabilities.
+
+✅ [**Zed-Editor**](https://github.com/zed-industries/zed) - Code at the speed of thought – Zed is a high-performance, multiplayer code editor from the creators of Atom and Tree-sitter.
 
 ✅ [**Qdrant**](https://qdrant.tech/) - A high-performance open-source vector store, specialized for AI. While Supabase also offers vector capabilities, Qdrant is included for its speed, making it ideal for demanding AI tasks.
 
