@@ -88,6 +88,15 @@ class EnhancedWorkspaceManager:
             'searxng': [],
             'crawl4ai': [],
             'letta': [],
+            'agentnn-dispatcher': ['agentnn-registry', 'agentnn-session-manager', 'agentnn-vector-store', 'agentnn-llm-gateway'],
+            'agentnn-registry': [],
+            'agentnn-session-manager': ['agentnn-redis'],
+            'agentnn-vector-store': [],
+            'agentnn-llm-gateway': [],
+            'agentnn-worker-dev': [],
+            'agentnn-worker-loh': [],
+            'agentnn-worker-openhands': [],
+            'agentnn-redis': [],
             
             # Ollama variants
             'ollama-cpu': [],
@@ -338,6 +347,7 @@ class EnhancedWorkspaceManager:
             'searxng': 'searxng' in compose_profiles,
             'crawl4ai': 'crawl4ai' in compose_profiles,
             'letta': 'letta' in compose_profiles,
+            'agentnn': 'agent-nn' in compose_profiles,
             
             # Ollama variants
             'ollama': any(profile in compose_profiles for profile in ['cpu', 'gpu-nvidia', 'gpu-amd']),
